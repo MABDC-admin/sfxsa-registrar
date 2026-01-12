@@ -8,6 +8,7 @@ import storageRoutes from './routes/storage.js';
 import dashboardRoutes from './routes/dashboard.js';
 import studentDocumentsRoutes from './routes/studentDocuments.js';
 import teacherAssignmentsRoutes from './routes/teacherAssignments.js';
+import { runMigrations } from '../run-migration-on-start.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -72,6 +73,9 @@ app.use((err, req, res, next) => {
 const server = app.listen(PORT, '0.0.0.0', async () => {
   console.log(`Backend server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  
+  // Run database migrations
+  await runMigrations();
   
   // Test database connection on startup
   try {
