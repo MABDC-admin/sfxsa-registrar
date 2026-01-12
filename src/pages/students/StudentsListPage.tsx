@@ -68,7 +68,7 @@ export function StudentsListPage() {
   // Update age dynamically when birthdate changes in form
   useEffect(() => {
     if (formData.birthdate) {
-      const _age = calculateAge(formData.birthdate)
+      // const age = calculateAge(formData.birthdate)
       // Since age is not in formData, we might just display it or include it in submission
     }
   }, [formData.birthdate])

@@ -37,12 +37,13 @@ const gradeColors: Record<string, string> = {
 
 const gradeLevels = ['Kindergarten 1', 'Kindergarten 2', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12']
 
-const _demoTeachers: Teacher[] = [
-  { id: '1', full_name: 'Sarah Mitchell', email: 'sarah.mitchell@school.com', password: 'teacher123', assigned_levels: ['Kindergarten 1'], assigned_subjects: ['English', 'Mathematics'], avatar_url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Sarah&backgroundColor=transparent' },
-  { id: '2', full_name: 'Michael Thompson', email: 'michael.thompson@school.com', password: 'teacher123', assigned_levels: ['Kindergarten 2'], assigned_subjects: ['English', 'Science'], avatar_url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Michael&backgroundColor=transparent' },
-  { id: '3', full_name: 'Jennifer Garcia', email: 'jennifer.garcia@school.com', password: 'teacher123', assigned_levels: ['Grade 1'], assigned_subjects: ['Mathematics', 'Filipino'], avatar_url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Jennifer&backgroundColor=transparent' },
-  { id: '4', full_name: 'David Martinez', email: 'david.martinez@school.com', password: 'teacher123', assigned_levels: ['Grade 2'], assigned_subjects: ['Science', 'Social Studies'], avatar_url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=David&backgroundColor=transparent' },
-]
+// Demo teachers data (for reference only)
+// const demoTeachers: Teacher[] = [
+//   { id: '1', full_name: 'Sarah Mitchell', email: 'sarah.mitchell@school.com', password: 'teacher123', assigned_levels: ['Kindergarten 1'], assigned_subjects: ['English', 'Mathematics'], avatar_url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Sarah&backgroundColor=transparent' },
+//   { id: '2', full_name: 'Michael Thompson', email: 'michael.thompson@school.com', password: 'teacher123', assigned_levels: ['Kindergarten 2'], assigned_subjects: ['English', 'Science'], avatar_url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Michael&backgroundColor=transparent' },
+//   { id: '3', full_name: 'Jennifer Garcia', email: 'jennifer.garcia@school.com', password: 'teacher123', assigned_levels: ['Grade 1'], assigned_subjects: ['Mathematics', 'Filipino'], avatar_url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Jennifer&backgroundColor=transparent' },
+//   { id: '4', full_name: 'David Martinez', email: 'david.martinez@school.com', password: 'teacher123', assigned_levels: ['Grade 2'], assigned_subjects: ['Science', 'Social Studies'], avatar_url: 'https://api.dicebear.com/7.x/adventurer/svg?seed=David&backgroundColor=transparent' },
+// ]
 
 export function TeachersListPage() {
   const toast = useToast()
