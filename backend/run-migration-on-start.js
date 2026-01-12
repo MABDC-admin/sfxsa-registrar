@@ -16,7 +16,7 @@ export async function runMigrations() {
   try {
     console.log('🔧 Running database migrations...');
 
-    // Check if teacher_subject_grade_assignments table exists
+    // Migration 1: Check if teacher_subject_grade_assignments table exists
     const tableCheck = await pool.query(`
       SELECT EXISTS (
         SELECT FROM information_schema.tables 
@@ -50,6 +50,79 @@ export async function runMigrations() {
     } else {
       console.log('✅ Teacher assignments table already exists');
     }
+
+    // Migration 2: Update classes table structure
+    console.log('📝 Checking classes table structure...');
+    
+    // Check if subject_name column exists
+    const subjectNameCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_name = 'classes' AND column_name = 'subject_name'
+      );
+    `);
+
+    if (!subjectNameCheck.rows[0].exists) {
+      console.log('📝 Adding subject_name column to classes table...');
+      await pool.query(`
+        ALTER TABLE classes ADD COLUMN IF NOT EXISTS subject_name TEXT;
+        UPDATE classes SET subject_name = name WHERE subject_name IS NULL;
+      `);
+    }
+
+    // Check if section_id column exists
+    const sectionIdCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_name = 'classes' AND column_name = 'section_id'
+      );
+    `);
+
+    if (!sectionIdCheck.rows[0].exists) {
+      console.log('📝 Adding section_id column to classes table...');
+      await pool.query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS section_id UUID REFERENCES sections(id);`);
+    }
+
+    // Check if academic_year_id column exists
+    const academicYearIdCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_name = 'classes' AND column_name = 'academic_year_id'
+      );
+    `);
+
+    if (!academicYearIdCheck.rows[0].exists) {
+      console.log('📝 Adding academic_year_id column to classes table...');
+      await pool.query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS academic_year_id UUID REFERENCES academic_years(id);`);
+    }
+
+    // Check if class_code column exists
+    const classCodeCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_name = 'classes' AND column_name = 'class_code'
+      );
+    `);
+
+    if (!classCodeCheck.rows[0].exists) {
+      console.log('📝 Adding class_code column to classes table...');
+      await pool.query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS class_code TEXT;`);
+    }
+
+    // Check if created_by column exists
+    const createdByCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_name = 'classes' AND column_name = 'created_by'
+      );
+    `);
+
+    if (!createdByCheck.rows[0].exists) {
+      console.log('📝 Adding created_by column to classes table...');
+      await pool.query(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES auth_users(id);`);
+    }
+
+    console.log('✅ Classes table structure updated successfully!');
 
   } catch (error) {
     console.error('❌ Migration error:', error.message);
