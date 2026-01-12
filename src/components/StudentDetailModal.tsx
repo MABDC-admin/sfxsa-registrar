@@ -92,6 +92,41 @@ export function StudentDetailModal({ student: initialStudent, onClose, onUpdate,
     }
   }, [editForm.birth_date, isEditing])
 
+  // Load student documents from database
+  useEffect(() => {
+    async function loadDocuments() {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/student-documents/student/${student.id}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (response.ok) {
+          const result = await response.json()
+          if (result.data) {
+            // Transform to match Document interface
+            const docs: Document[] = result.data.map((doc: any) => ({
+              id: doc.id,
+              name: doc.name,
+              file_path: doc.file_path,
+              file_type: doc.file_type,
+              uploaded_at: doc.created_at,
+              uploaded_by: doc.uploaded_by_name || 'Admin',
+              preview_url: `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/storage/v1/${doc.file_path}`
+            }))
+            setDocuments(docs)
+          }
+        }
+      } catch (err) {
+        console.error('Error loading documents:', err)
+      }
+    }
+    
+    loadDocuments()
+  }, [student.id])
+
   const colors = gradeAccentColors[student.grade_level] || { header: '#00CED1', accent: '#00CED1', cardBg: '#E0FFFF' }
 
   // Format date
@@ -179,7 +214,7 @@ export function StudentDetailModal({ student: initialStudent, onClose, onUpdate,
     setUploading(true)
     try {
       const fileExt = selectedFile.name.split('.').pop() || 'unknown'
-      // const fileName = `${Date.now()}-${docName.replace(/\s+/g, '_')}.${fileExt}`
+      
       // Upload to database-backed storage
       const { data: uploadData, error: uploadError } = await api.storage
         .from('db')
@@ -191,17 +226,44 @@ export function StudentDetailModal({ student: initialStudent, onClose, onUpdate,
         return
       }
 
-      const { data: urlData } = api.storage.from('db').getPublicUrl(uploadData.path)
+      const blobId = uploadData.path
+      const { data: urlData } = api.storage.from('db').getPublicUrl(blobId)
 
-      const newDoc: Document = {
-        id: uploadData.id || Date.now().toString(),
+      // Save document metadata to student_documents table
+      const docData = {
         name: docName,
-        file_path: `db/${uploadData.path}`,
+        category: 'general',
+        file_path: `db/${blobId}`,
+        file_type: fileExt,
+        file_size: selectedFile.size,
+        blob_id: blobId
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/student-documents/student/${student.id}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(docData)
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save document metadata')
+      }
+
+      const result = await response.json()
+      
+      const newDoc: Document = {
+        id: result.data.id,
+        name: docName,
+        file_path: `db/${blobId}`,
         file_type: fileExt,
         uploaded_at: new Date().toISOString(),
         uploaded_by: 'Admin',
         preview_url: urlData.publicUrl
       }
+      
       setDocuments([...documents, newDoc])
       setShowUploadModal(false)
       setSelectedFile(null)
@@ -218,14 +280,24 @@ export function StudentDetailModal({ student: initialStudent, onClose, onUpdate,
     if (!confirm(`Delete "${doc.name}"?`)) return
 
     try {
-      const parts = doc.file_path.split('/')
-      const bucket = parts.length > 1 ? parts[0] : 'db'
-      const filePath = parts.length > 1 ? parts.slice(1).join('/') : doc.file_path
-      
-      await api.storage.from(bucket).remove([filePath])
+      // Delete from database first
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/student-documents/${doc.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete document')
+      }
+
+      // Remove from local state
       setDocuments(documents.filter(d => d.id !== doc.id))
     } catch (err) {
       console.error('Delete error:', err)
+      alert('Failed to delete document: ' + (err as Error).message)
     }
   }
 

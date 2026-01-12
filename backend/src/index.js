@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js';
 import dataRoutes from './routes/data.js';
 import storageRoutes from './routes/storage.js';
 import dashboardRoutes from './routes/dashboard.js';
+import studentDocumentsRoutes from './routes/studentDocuments.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -47,6 +48,7 @@ app.use('/auth', authRoutes);
 app.use('/rest/v1', dataRoutes);
 app.use('/storage/v1', storageRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/student-documents', studentDocumentsRoutes);
 
 // Health check
 app.get('/health', async (req, res) => {

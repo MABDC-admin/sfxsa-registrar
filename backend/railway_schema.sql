@@ -125,12 +125,20 @@ CREATE INDEX IF NOT EXISTS idx_student_records_lrn ON student_records(lrn);
 CREATE TABLE IF NOT EXISTS student_documents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_id UUID REFERENCES student_records(id) ON DELETE CASCADE,
+  blob_id UUID REFERENCES storage_blobs(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  category TEXT DEFAULT 'general',
   file_path TEXT NOT NULL,
   file_type TEXT DEFAULT '',
   file_size INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  uploaded_by UUID REFERENCES auth_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_student_documents_student ON student_documents(student_id);
+CREATE INDEX IF NOT EXISTS idx_student_documents_blob ON student_documents(blob_id);
+CREATE INDEX IF NOT EXISTS idx_student_documents_uploaded_by ON student_documents(uploaded_by);
 
 -- ============================================
 -- SCHOOL SETTINGS TABLE
