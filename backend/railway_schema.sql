@@ -145,20 +145,38 @@ CREATE INDEX IF NOT EXISTS idx_student_documents_uploaded_by ON student_document
 -- ============================================
 CREATE TABLE IF NOT EXISTS school_settings (
   id SERIAL PRIMARY KEY,
-  name TEXT DEFAULT '',
+  name TEXT DEFAULT 'St. Francis Xavier Smart Academy Inc.',
   address TEXT DEFAULT '',
+  city TEXT DEFAULT '',
+  state TEXT DEFAULT '',
+  country TEXT DEFAULT '',
+  postal_code TEXT DEFAULT '',
   phone TEXT DEFAULT '',
+  fax TEXT DEFAULT '',
   email TEXT DEFAULT '',
   website TEXT DEFAULT '',
-  principal TEXT DEFAULT '',
+  principal_name TEXT DEFAULT '',
+  principal_email TEXT DEFAULT '',
   founded_year TEXT DEFAULT '',
+  mission_statement TEXT DEFAULT '',
+  vision_statement TEXT DEFAULT '',
+  motto TEXT DEFAULT '',
+  logo_blob_id UUID REFERENCES storage_blobs(id) ON DELETE SET NULL,
   logo_url TEXT DEFAULT '',
+  crest_blob_id UUID REFERENCES storage_blobs(id) ON DELETE SET NULL,
+  crest_url TEXT DEFAULT '',
+  banner_blob_id UUID REFERENCES storage_blobs(id) ON DELETE SET NULL,
+  banner_url TEXT DEFAULT '',
+  accreditation TEXT DEFAULT '',
+  curriculum_type TEXT DEFAULT '',
+  school_colors TEXT DEFAULT '',
+  is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-INSERT INTO school_settings (id, name, address, phone, email, website, principal, founded_year)
-VALUES (1, 'Green Valley Academy', '123 Education Lane, Metro City', '+1 (555) 123-4567', 'admin@greenvalley.edu', 'www.greenvalley.edu', 'Dr. Maria Santos', '1995')
+INSERT INTO school_settings (id, name, address, phone, email, website, principal_name, founded_year)
+VALUES (1, 'St. Francis Xavier Smart Academy Inc.', 'Metro Manila, Philippines', '+63 (02) 1234-5678', 'admin@sfxsa.edu.ph', 'www.sfxsa.edu.ph', 'Dr. Maria Santos', '1995')
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================

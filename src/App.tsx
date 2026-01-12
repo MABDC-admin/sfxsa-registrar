@@ -28,6 +28,7 @@ import { SuggestionsFormPage } from './pages/SuggestionsFormPage'
 import { SuggestionsInboxPage } from './pages/SuggestionsInboxPage'
 import { AnnouncementsPage } from './pages/AnnouncementsPage'
 import { AcademicYearsPage } from './pages/AcademicYearsPage'
+import { SchoolInfoPage } from './pages/SchoolInfoPage'
 import LessonMaterialsPage from './pages/LessonMaterialsPage'
 
 // Placeholder for Attendance (to be implemented)
@@ -114,6 +115,7 @@ function App() {
               <Route path="/finance" element={<FinanceListPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/inbox" element={<SuggestionsInboxPage />} />
+              <Route path="/school-info" element={<SchoolInfoPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
 

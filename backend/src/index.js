@@ -9,6 +9,7 @@ import dashboardRoutes from './routes/dashboard.js';
 import studentDocumentsRoutes from './routes/studentDocuments.js';
 import teacherAssignmentsRoutes from './routes/teacherAssignments.js';
 import classroomRoutes from './routes/classroom.js';
+import schoolInfoRoutes from './routes/schoolInfo.js';
 import { runMigrations } from '../run-migration-on-start.js';
 
 const app = express();
@@ -54,6 +55,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/student-documents', studentDocumentsRoutes);
 app.use('/api/teacher-assignments', teacherAssignmentsRoutes);
 app.use('/api/classroom', classroomRoutes);
+app.use('/api/school-info', schoolInfoRoutes);
 
 // Health check
 app.get('/health', async (req, res) => {

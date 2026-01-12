@@ -287,7 +287,48 @@ export async function runMigrations() {
       console.log('⚠️  Classroom schema migration error:', error.message);
     }
 
-    // Migration 5: Seed sections if they don't exist
+    // Migration 5: Update school_settings table with enhanced branding
+    console.log('📝 Updating school_settings table...');
+    try {
+      await pool.query(`
+        ALTER TABLE school_settings
+        ADD COLUMN IF NOT EXISTS city TEXT DEFAULT '',
+        ADD COLUMN IF NOT EXISTS state TEXT DEFAULT '',
+        ADD COLUMN IF NOT EXISTS country TEXT DEFAULT '',
+        ADD COLUMN IF NOT EXISTS postal_code TEXT DEFAULT '',
+        ADD COLUMN IF NOT EXISTS fax TEXT DEFAULT '',
+        ADD COLUMN IF NOT EXISTS principal_email TEXT DEFAULT '',
+        ADD COLUMN IF NOT EXISTS mission_statement TEXT DEFAULT '',
+        ADD COLUMN IF NOT EXISTS vision_statement TEXT DEFAULT '',
+        ADD COLUMN IF NOT EXISTS motto TEXT DEFAULT '',
+        ADD COLUMN IF NOT EXISTS logo_blob_id UUID REFERENCES storage_blobs(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS crest_blob_id UUID REFERENCES storage_blobs(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS crest_url TEXT DEFAULT '',
+        ADD COLUMN IF NOT EXISTS banner_blob_id UUID REFERENCES storage_blobs(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS banner_url TEXT DEFAULT '',
+        ADD COLUMN IF NOT EXISTS accreditation TEXT DEFAULT '',
+        ADD COLUMN IF NOT EXISTS curriculum_type TEXT DEFAULT '',
+        ADD COLUMN IF NOT EXISTS school_colors TEXT DEFAULT '',
+        ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+        
+        -- Rename principal to principal_name if needed
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT FROM information_schema.columns 
+            WHERE table_name = 'school_settings' AND column_name = 'principal'
+          ) THEN
+            ALTER TABLE school_settings RENAME COLUMN principal TO principal_name;
+          END IF;
+        END $$;
+      `);
+      
+      console.log('✅ School settings table updated!');
+    } catch (error) {
+      console.log('⚠️  School settings migration error:', error.message);
+    }
+
+    // Migration 6: Seed sections if they don't exist
     console.log('📝 Checking sections data...');
     const sectionsCheck = await pool.query('SELECT COUNT(*) FROM sections');
     const sectionsCount = parseInt(sectionsCheck.rows[0].count);

@@ -37,6 +37,7 @@ const defaultMenuItems: MenuItem[] = [
   { icon: '💳', label: 'Finance', path: '/finance', key: 'finance', roles: ['admin', 'finance', 'principal', 'accounting'] },
   { icon: '📊', label: 'Reports', path: '/reports', key: 'reports', roles: ['admin', 'finance', 'principal', 'registrar', 'accounting'] },
   { icon: '💬⭐', label: 'Suggestions', path: '/inbox', key: 'inbox', roles: ['admin', 'principal'] },
+  { icon: '🏫', label: 'School Info', path: '/school-info', key: 'school-info', roles: ['admin', 'principal'] },
   { icon: '⚙️', label: 'Settings', path: '/settings', key: 'settings', roles: ['admin', 'principal', 'registrar', 'accounting'] },
 ]
 
