@@ -14,6 +14,7 @@ interface ClassItem {
   grade_level: string
   section: string
   teacher_name: string
+  teacher_id?: string
   room: string
   schedule: string
   max_students: number
@@ -49,10 +50,12 @@ export function ClassesListPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; item: ClassItem | null }>({ open: false, item: null })
   const [deleting, setDeleting] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table')
+  const [teachers, setTeachers] = useState<Array<{ value: string; label: string }>>([])
   const [formData, setFormData] = useState({
     name: '',
     grade_level: 'Grade 1',
     section: '',
+    teacher_id: '',
     room: '',
     schedule: '',
     max_students: 40,
@@ -63,7 +66,15 @@ export function ClassesListPage() {
     setLoading(true)
     const { data } = await api
       .from('classes')
-      .select('*')
+      .select(`
+        *,
+        teacher:teacher_id (
+          id,
+          full_name,
+          email,
+          avatar_url
+        )
+      `)
       .order('name')
 
     if (data) {
@@ -72,7 +83,8 @@ export function ClassesListPage() {
         name: row.name || '',
         grade_level: row.grade_level || 'Grade 1',
         section: row.section || '',
-        teacher_name: row.teacher_name || 'Unassigned',
+        teacher_name: row.teacher?.full_name || 'Unassigned',
+        teacher_id: row.teacher_id,
         room: row.room || '',
         schedule: row.schedule || '',
         max_students: row.max_students || 40,
@@ -88,7 +100,24 @@ export function ClassesListPage() {
 
   useEffect(() => {
     loadClasses()
+    loadTeachers()
   }, [loadClasses])
+
+  async function loadTeachers() {
+    const { data } = await api
+      .from('profiles')
+      .select('id, full_name')
+      .eq('role', 'teacher')
+      .eq('is_active', true)
+      .order('full_name')
+    
+    if (data) {
+      setTeachers([
+        { value: '', label: 'Unassigned' },
+        ...data.map((t: any) => ({ value: t.id, label: t.full_name }))
+      ])
+    }
+  }
 
   useRealtimeSubscription({ table: 'classes' }, loadClasses, [])
 
@@ -102,7 +131,7 @@ export function ClassesListPage() {
 
   function openCreateModal() {
     setEditingClass(null)
-    setFormData({ name: '', grade_level: 'Grade 1', section: '', room: '', schedule: '', max_students: 40 })
+    setFormData({ name: '', grade_level: 'Grade 1', section: '', teacher_id: '', room: '', schedule: '', max_students: 40 })
     setFormErrors({})
     setShowModal(true)
   }
@@ -113,6 +142,7 @@ export function ClassesListPage() {
       name: cls.name,
       grade_level: cls.grade_level,
       section: cls.section,
+      teacher_id: cls.teacher_id || '',
       room: cls.room,
       schedule: cls.schedule,
       max_students: cls.max_students,
@@ -141,6 +171,7 @@ export function ClassesListPage() {
             name: formData.name,
             grade_level: formData.grade_level,
             section: formData.section,
+            teacher_id: formData.teacher_id || null,
             room: formData.room,
             schedule: formData.schedule,
             max_students: formData.max_students,
@@ -156,6 +187,7 @@ export function ClassesListPage() {
             name: formData.name,
             grade_level: formData.grade_level,
             section: formData.section,
+            teacher_id: formData.teacher_id || null,
             room: formData.room,
             schedule: formData.schedule,
             max_students: formData.max_students,
@@ -381,6 +413,13 @@ export function ClassesListPage() {
               placeholder="e.g., Section A"
             />
           </div>
+          <Select
+            label="Assign Teacher"
+            value={formData.teacher_id}
+            onChange={(value) => setFormData({ ...formData, teacher_id: value })}
+            options={teachers}
+            placeholder="Select a teacher"
+          />
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="Room"

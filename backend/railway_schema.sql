@@ -566,7 +566,7 @@ CREATE TABLE IF NOT EXISTS classes (
   grade_level TEXT NOT NULL,
   section TEXT DEFAULT '',
   school_year TEXT NOT NULL,
-  teacher_id UUID,
+  teacher_id UUID REFERENCES auth_users(id) ON DELETE SET NULL,
   room TEXT DEFAULT '',
   schedule TEXT DEFAULT '',
   max_students INTEGER DEFAULT 40,
@@ -577,6 +577,7 @@ CREATE TABLE IF NOT EXISTS classes (
 
 CREATE INDEX IF NOT EXISTS idx_classes_school_year ON classes(school_year);
 CREATE INDEX IF NOT EXISTS idx_classes_grade ON classes(grade_level);
+CREATE INDEX IF NOT EXISTS idx_classes_teacher ON classes(teacher_id);
 
 -- ============================================
 -- ATTENDANCE TABLE

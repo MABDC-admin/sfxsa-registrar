@@ -124,7 +124,34 @@ export async function runMigrations() {
 
     console.log('✅ Classes table structure updated successfully!');
 
-    // Migration 3: Seed sections if they don't exist
+    // Migration 3: Add foreign key constraint to teacher_id in classes table
+    console.log('📝 Adding foreign key constraint to classes.teacher_id...');
+    try {
+      await pool.query(`
+        DO $$ 
+        BEGIN
+          -- Check if foreign key constraint already exists
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.table_constraints 
+            WHERE constraint_name = 'classes_teacher_id_fkey' 
+            AND table_name = 'classes'
+          ) THEN
+            -- Add foreign key constraint
+            ALTER TABLE classes 
+            ADD CONSTRAINT classes_teacher_id_fkey 
+            FOREIGN KEY (teacher_id) REFERENCES auth_users(id) ON DELETE SET NULL;
+            
+            -- Add index for teacher_id if not exists
+            CREATE INDEX IF NOT EXISTS idx_classes_teacher ON classes(teacher_id);
+          END IF;
+        END $$;
+      `);
+      console.log('✅ Foreign key constraint added!');
+    } catch (error) {
+      console.log('⚠️  Foreign key constraint may already exist or failed:', error.message);
+    }
+
+    // Migration 4: Seed sections if they don't exist
     console.log('📝 Checking sections data...');
     const sectionsCheck = await pool.query('SELECT COUNT(*) FROM sections');
     const sectionsCount = parseInt(sectionsCheck.rows[0].count);
