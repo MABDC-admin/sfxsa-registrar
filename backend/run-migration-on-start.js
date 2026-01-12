@@ -151,7 +151,143 @@ export async function runMigrations() {
       console.log('⚠️  Foreign key constraint may already exist or failed:', error.message);
     }
 
-    // Migration 4: Seed sections if they don't exist
+    // Migration 4: Add Google Classroom-like schema
+    console.log('📝 Adding Google Classroom schema tables...');
+    try {
+      // Add new columns to classes table
+      await pool.query(`
+        ALTER TABLE classes 
+        ADD COLUMN IF NOT EXISTS subject_name TEXT,
+        ADD COLUMN IF NOT EXISTS section_id UUID REFERENCES sections(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS academic_year_id UUID REFERENCES academic_years(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS class_code TEXT,
+        ADD COLUMN IF NOT EXISTS description TEXT DEFAULT '',
+        ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES auth_users(id) ON DELETE SET NULL;
+        
+        -- Add unique constraint on class_code if not exists
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.table_constraints
+            WHERE constraint_name = 'classes_class_code_key'
+          ) THEN
+            ALTER TABLE classes ADD CONSTRAINT classes_class_code_key UNIQUE (class_code);
+          END IF;
+        END $$;
+        
+        CREATE INDEX IF NOT EXISTS idx_classes_code ON classes(class_code);
+      `);
+      
+      // Create class_memberships table
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS class_memberships (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
+          user_id UUID REFERENCES auth_users(id) ON DELETE CASCADE,
+          role TEXT NOT NULL CHECK (role IN ('teacher', 'student', 'assistant')),
+          joined_at TIMESTAMPTZ DEFAULT NOW(),
+          UNIQUE(class_id, user_id)
+        );
+        
+        CREATE INDEX IF NOT EXISTS idx_memberships_class ON class_memberships(class_id);
+        CREATE INDEX IF NOT EXISTS idx_memberships_user ON class_memberships(user_id);
+      `);
+      
+      // Create topics table
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS topics (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          description TEXT,
+          order_index INTEGER DEFAULT 0,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        
+        CREATE INDEX IF NOT EXISTS idx_topics_class ON topics(class_id);
+      `);
+      
+      // Create lessons table
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS lessons (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          topic_id UUID REFERENCES topics(id) ON DELETE CASCADE,
+          class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          description TEXT,
+          order_index INTEGER DEFAULT 0,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        
+        CREATE INDEX IF NOT EXISTS idx_lessons_topic ON lessons(topic_id);
+        CREATE INDEX IF NOT EXISTS idx_lessons_class ON lessons(class_id);
+      `);
+      
+      // Create materials table
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS materials (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          lesson_id UUID REFERENCES lessons(id) ON DELETE CASCADE,
+          topic_id UUID REFERENCES topics(id) ON DELETE CASCADE,
+          class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          description TEXT,
+          type TEXT CHECK (type IN ('document', 'link', 'video', 'other')),
+          file_path TEXT,
+          file_url TEXT,
+          created_by UUID REFERENCES auth_users(id) ON DELETE SET NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        
+        CREATE INDEX IF NOT EXISTS idx_materials_lesson ON materials(lesson_id);
+        CREATE INDEX IF NOT EXISTS idx_materials_topic ON materials(topic_id);
+        CREATE INDEX IF NOT EXISTS idx_materials_class ON materials(class_id);
+      `);
+      
+      // Update assignments table
+      await pool.query(`
+        ALTER TABLE assignments
+        ADD COLUMN IF NOT EXISTS topic_id UUID REFERENCES topics(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS lesson_id UUID REFERENCES lessons(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS instructions TEXT,
+        ADD COLUMN IF NOT EXISTS allow_late_submission BOOLEAN DEFAULT true;
+        
+        CREATE INDEX IF NOT EXISTS idx_assignments_topic ON assignments(topic_id);
+        CREATE INDEX IF NOT EXISTS idx_assignments_lesson ON assignments(lesson_id);
+      `);
+      
+      // Update submissions table
+      await pool.query(`
+        ALTER TABLE submissions
+        ADD COLUMN IF NOT EXISTS file_path TEXT,
+        ADD COLUMN IF NOT EXISTS graded_by UUID REFERENCES auth_users(id) ON DELETE SET NULL;
+        
+        -- Change student_id reference if needed
+        DO $$
+        BEGIN
+          -- Drop old constraint if it references student_records
+          IF EXISTS (
+            SELECT 1 FROM information_schema.table_constraints
+            WHERE constraint_name LIKE '%student_id%' AND table_name = 'submissions'
+          ) THEN
+            ALTER TABLE submissions DROP CONSTRAINT IF EXISTS submissions_student_id_fkey;
+            ALTER TABLE submissions ADD CONSTRAINT submissions_student_id_fkey 
+              FOREIGN KEY (student_id) REFERENCES auth_users(id) ON DELETE CASCADE;
+          END IF;
+        END $$;
+        
+        CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
+      `);
+      
+      console.log('✅ Google Classroom schema tables added!');
+    } catch (error) {
+      console.log('⚠️  Classroom schema migration error:', error.message);
+    }
+
+    // Migration 5: Seed sections if they don't exist
     console.log('📝 Checking sections data...');
     const sectionsCheck = await pool.query('SELECT COUNT(*) FROM sections');
     const sectionsCount = parseInt(sectionsCheck.rows[0].count);

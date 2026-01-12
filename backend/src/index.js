@@ -8,6 +8,7 @@ import storageRoutes from './routes/storage.js';
 import dashboardRoutes from './routes/dashboard.js';
 import studentDocumentsRoutes from './routes/studentDocuments.js';
 import teacherAssignmentsRoutes from './routes/teacherAssignments.js';
+import classroomRoutes from './routes/classroom.js';
 import { runMigrations } from '../run-migration-on-start.js';
 
 const app = express();
@@ -52,6 +53,7 @@ app.use('/storage/v1', storageRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/student-documents', studentDocumentsRoutes);
 app.use('/api/teacher-assignments', teacherAssignmentsRoutes);
+app.use('/api/classroom', classroomRoutes);
 
 // Health check
 app.get('/health', async (req, res) => {

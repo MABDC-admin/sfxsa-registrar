@@ -558,19 +558,25 @@ CREATE INDEX IF NOT EXISTS idx_announcements_created ON announcements(created_at
 CREATE INDEX IF NOT EXISTS idx_announcements_priority ON announcements(priority);
 
 -- ============================================
--- CLASSES TABLE
+-- CLASSES TABLE (Google Classroom-like)
 -- ============================================
 CREATE TABLE IF NOT EXISTS classes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
+  subject_name TEXT,
   grade_level TEXT NOT NULL,
   section TEXT DEFAULT '',
+  section_id UUID REFERENCES sections(id) ON DELETE SET NULL,
   school_year TEXT NOT NULL,
+  academic_year_id UUID REFERENCES academic_years(id) ON DELETE SET NULL,
   teacher_id UUID REFERENCES auth_users(id) ON DELETE SET NULL,
+  class_code TEXT UNIQUE NOT NULL,
+  description TEXT DEFAULT '',
   room TEXT DEFAULT '',
   schedule TEXT DEFAULT '',
   max_students INTEGER DEFAULT 40,
   is_active BOOLEAN DEFAULT true,
+  created_by UUID REFERENCES auth_users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -578,6 +584,76 @@ CREATE TABLE IF NOT EXISTS classes (
 CREATE INDEX IF NOT EXISTS idx_classes_school_year ON classes(school_year);
 CREATE INDEX IF NOT EXISTS idx_classes_grade ON classes(grade_level);
 CREATE INDEX IF NOT EXISTS idx_classes_teacher ON classes(teacher_id);
+CREATE INDEX IF NOT EXISTS idx_classes_code ON classes(class_code);
+
+-- ============================================
+-- CLASS MEMBERSHIPS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS class_memberships (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth_users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('teacher', 'student', 'assistant')),
+  joined_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(class_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_memberships_class ON class_memberships(class_id);
+CREATE INDEX IF NOT EXISTS idx_memberships_user ON class_memberships(user_id);
+
+-- ============================================
+-- TOPICS TABLE (Classwork organization)
+-- ============================================
+CREATE TABLE IF NOT EXISTS topics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  order_index INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_topics_class ON topics(class_id);
+
+-- ============================================
+-- LESSONS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS lessons (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  topic_id UUID REFERENCES topics(id) ON DELETE CASCADE,
+  class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  order_index INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_lessons_topic ON lessons(topic_id);
+CREATE INDEX IF NOT EXISTS idx_lessons_class ON lessons(class_id);
+
+-- ============================================
+-- MATERIALS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS materials (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  lesson_id UUID REFERENCES lessons(id) ON DELETE CASCADE,
+  topic_id UUID REFERENCES topics(id) ON DELETE CASCADE,
+  class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  type TEXT CHECK (type IN ('document', 'link', 'video', 'other')),
+  file_path TEXT,
+  file_url TEXT,
+  created_by UUID REFERENCES auth_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_materials_lesson ON materials(lesson_id);
+CREATE INDEX IF NOT EXISTS idx_materials_topic ON materials(topic_id);
+CREATE INDEX IF NOT EXISTS idx_materials_class ON materials(class_id);
 
 -- ============================================
 -- ATTENDANCE TABLE
@@ -637,37 +713,52 @@ CREATE TABLE IF NOT EXISTS sections (
 CREATE INDEX IF NOT EXISTS idx_sections_grade_level ON sections(grade_level_id);
 
 -- ============================================
--- ASSIGNMENTS TABLE
+-- ASSIGNMENTS TABLE (Enhanced for Classroom)
 -- ============================================
 CREATE TABLE IF NOT EXISTS assignments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
+  topic_id UUID REFERENCES topics(id) ON DELETE SET NULL,
+  lesson_id UUID REFERENCES lessons(id) ON DELETE SET NULL,
+  teacher_id UUID REFERENCES auth_users(id) ON DELETE SET NULL,
   title TEXT NOT NULL,
   description TEXT,
+  instructions TEXT,
   due_date TIMESTAMPTZ,
-  class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
-  teacher_id UUID REFERENCES auth_users(id),
   points_possible INTEGER DEFAULT 100,
+  allow_late_submission BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE INDEX IF NOT EXISTS idx_assignments_class ON assignments(class_id);
+CREATE INDEX IF NOT EXISTS idx_assignments_topic ON assignments(topic_id);
+CREATE INDEX IF NOT EXISTS idx_assignments_teacher ON assignments(teacher_id);
+
 -- ============================================
--- SUBMISSIONS TABLE
+-- SUBMISSIONS TABLE (Enhanced)
 -- ============================================
 CREATE TABLE IF NOT EXISTS submissions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   assignment_id UUID REFERENCES assignments(id) ON DELETE CASCADE,
-  student_id UUID REFERENCES student_records(id) ON DELETE CASCADE,
+  student_id UUID REFERENCES auth_users(id) ON DELETE CASCADE,
   content TEXT,
+  file_path TEXT,
   file_url TEXT,
-  status TEXT DEFAULT 'submitted' CHECK (status IN ('submitted', 'late', 'graded', 'returned')),
+  status TEXT DEFAULT 'submitted' CHECK (status IN ('submitted', 'late', 'graded', 'returned', 'missing')),
   submitted_at TIMESTAMPTZ DEFAULT NOW(),
   graded_at TIMESTAMPTZ,
   grade DECIMAL(5,2),
   feedback TEXT,
-  teacher_id UUID REFERENCES auth_users(id),
+  graded_by UUID REFERENCES auth_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(student_id, assignment_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_submissions_assignment ON submissions(assignment_id);
+CREATE INDEX IF NOT EXISTS idx_submissions_student ON submissions(student_id);
+CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
 
 -- ============================================
 -- STUDENT GRADES TABLE (for Final Grades)
