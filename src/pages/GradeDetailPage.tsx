@@ -12,6 +12,13 @@ interface Subject {
   icon: string
   classwork_count: number
   students_count: number
+  assigned_teacher?: {
+    id: string
+    name: string
+    email: string
+    avatar: string
+    assignment_id: string
+  }
 }
 
 const subjectColors: { [key: string]: string } = {
@@ -47,6 +54,14 @@ export function GradeDetailPage() {
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null)
   const [formData, setFormData] = useState({ name: '', section: 'Section A' })
   const [sections, setSections] = useState<{id: string, name: string}[]>([])
+  
+  // Teacher assignment states
+  const [showTeacherModal, setShowTeacherModal] = useState(false)
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null)
+  const [availableTeachers, setAvailableTeachers] = useState<any[]>([])
+  const [loadingTeachers, setLoadingTeachers] = useState(false)
+  const [gradeLevelId, setGradeLevelId] = useState<string>('')
+  const [academicYearId, setAcademicYearId] = useState<string>('')
 
   useEffect(() => {
     loadGradeData()
@@ -64,6 +79,28 @@ export function GradeDetailPage() {
     }
     const currentGradeName = gradeNames[gradeId || 'g1'] || 'Grade 1'
     setGradeName(currentGradeName)
+
+    // Get grade level ID from database
+    const { data: gradeLevelData } = await api
+      .from('grade_levels')
+      .select('id')
+      .eq('name', currentGradeName)
+      .single()
+    
+    if (gradeLevelData) {
+      setGradeLevelId(gradeLevelData.id)
+    }
+
+    // Get academic year ID
+    const { data: activeYear } = await api
+      .from('academic_years')
+      .select('id')
+      .eq('name', selectedYear)
+      .single()
+    
+    if (activeYear) {
+      setAcademicYearId(activeYear.id)
+    }
 
     // Try to get sections for this grade from database
     const { data: sectionsData } = await api
@@ -109,16 +146,51 @@ export function GradeDetailPage() {
 
       const studentCount = studentRecords?.filter((r: any) => (r.grade_level || r.level) === levelFilter).length || 0
 
-      const formattedSubjects: Subject[] = classesData.map((c: any) => ({
-        id: c.id,
-        name: c.subject_name,
-        section: c.sections?.name || 'Section A',
-        section_id: c.section_id,
-        color: subjectColors[c.subject_name] || subjectColors['English'],
-        icon: subjectIcons[c.subject_name] || '📚',
-        classwork_count: 0,
-        students_count: studentCount
-      }))
+      // Load teacher assignments for this grade level and academic year
+      let teacherAssignments: any[] = []
+      if (gradeLevelData && activeYear) {
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+        try {
+          const response = await fetch(
+            `${apiUrl}/api/teacher-assignments/grade/${gradeLevelData.id}/year/${activeYear.id}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          )
+          if (response.ok) {
+            const result = await response.json()
+            teacherAssignments = result.data || []
+          }
+        } catch (error) {
+          console.error('Error loading teacher assignments:', error)
+        }
+      }
+
+      const formattedSubjects: Subject[] = classesData.map((c: any) => {
+        // Find subject ID from subjects table
+        const subjectMatch = teacherAssignments.find((ta: any) => ta.subject_name === c.subject_name)
+        
+        return {
+          id: c.id,
+          name: c.subject_name,
+          section: c.sections?.name || 'Section A',
+          section_id: c.section_id,
+          color: subjectColors[c.subject_name] || subjectColors['English'],
+          icon: subjectIcons[c.subject_name] || '📚',
+          classwork_count: 0,
+          students_count: studentCount,
+          assigned_teacher: subjectMatch ? {
+            id: subjectMatch.teacher_id,
+            name: subjectMatch.teacher_name,
+            email: subjectMatch.teacher_email,
+            avatar: subjectMatch.teacher_avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(subjectMatch.teacher_name)}&backgroundColor=transparent`,
+            assignment_id: subjectMatch.id
+          } : undefined
+        }
+      })
       setSubjects(formattedSubjects)
     } else {
       // No classes in DB yet - show empty state or allow creating
@@ -249,6 +321,130 @@ export function GradeDetailPage() {
     }
   }
 
+  // Teacher assignment functions
+  async function handleAssignTeacher(subject: Subject) {
+    setSelectedSubject(subject)
+    setShowTeacherModal(true)
+    await loadAvailableTeachers(subject.name)
+  }
+
+  async function loadAvailableTeachers(subjectName: string) {
+    setLoadingTeachers(true)
+    try {
+      // Get subject ID from subjects table
+      const { data: subjectData } = await api
+        .from('subjects')
+        .select('id')
+        .eq('name', subjectName)
+        .single()
+
+      if (subjectData) {
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+        const response = await fetch(
+          `${apiUrl}/api/teacher-assignments/available-teachers/${subjectData.id}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        )
+        
+        if (response.ok) {
+          const result = await response.json()
+          setAvailableTeachers(result.data || [])
+        }
+      }
+    } catch (error) {
+      console.error('Error loading available teachers:', error)
+    } finally {
+      setLoadingTeachers(false)
+    }
+  }
+
+  async function handleSelectTeacher(teacherId: string) {
+    if (!selectedSubject || !gradeLevelId || !academicYearId) {
+      alert('Missing required data. Please refresh the page and try again.')
+      return
+    }
+
+    try {
+      // Get subject ID from subjects table
+      const { data: subjectData } = await api
+        .from('subjects')
+        .select('id')
+        .eq('name', selectedSubject.name)
+        .single()
+
+      if (!subjectData) {
+        alert('Subject not found')
+        return
+      }
+
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      const response = await fetch(
+        `${apiUrl}/api/teacher-assignments`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            teacher_id: teacherId,
+            subject_id: subjectData.id,
+            grade_level_id: gradeLevelId,
+            academic_year_id: academicYearId
+          })
+        }
+      )
+
+      if (response.ok) {
+        alert('Teacher assigned successfully!')
+        setShowTeacherModal(false)
+        await loadGradeData() // Reload to show new assignment
+      } else {
+        const result = await response.json()
+        alert(result.error?.message || 'Failed to assign teacher')
+      }
+    } catch (error) {
+      console.error('Error assigning teacher:', error)
+      alert('Failed to assign teacher. Please try again.')
+    }
+  }
+
+  async function handleRemoveTeacher(subject: Subject) {
+    if (!subject.assigned_teacher) return
+    
+    if (!confirm(`Remove ${subject.assigned_teacher.name} from ${subject.name}?`)) {
+      return
+    }
+
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+      const response = await fetch(
+        `${apiUrl}/api/teacher-assignments/${subject.assigned_teacher.assignment_id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+
+      if (response.ok) {
+        alert('Teacher removed successfully!')
+        await loadGradeData() // Reload to show updated assignments
+      } else {
+        alert('Failed to remove teacher')
+      }
+    } catch (error) {
+      console.error('Error removing teacher:', error)
+      alert('Failed to remove teacher. Please try again.')
+    }
+  }
+
   return (
     <div className="flex-1 p-6" style={{ backgroundColor: '#F8FAF7' }}>
       {/* Back Link */}
@@ -320,6 +516,41 @@ export function GradeDetailPage() {
 
               {/* Subject Stats */}
               <div className="bg-white p-4">
+                {/* Teacher Assignment */}
+                {subject.assigned_teacher ? (
+                  <div className="mb-4 pb-4 border-b border-gray-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-gray-500 uppercase">Assigned Teacher</span>
+                      <button
+                        onClick={() => handleRemoveTeacher(subject)}
+                        className="text-xs text-red-500 hover:text-red-700"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={subject.assigned_teacher.avatar}
+                        alt={subject.assigned_teacher.name}
+                        className="w-8 h-8 rounded-full"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">{subject.assigned_teacher.name}</p>
+                        <p className="text-xs text-gray-500">{subject.assigned_teacher.email}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mb-4 pb-4 border-b border-gray-100">
+                    <button
+                      onClick={() => handleAssignTeacher(subject)}
+                      className="w-full py-2 px-3 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-green-500 hover:text-green-600 transition-colors"
+                    >
+                      + Assign Teacher
+                    </button>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
                   <div className="flex items-center gap-1">
                     <span>📚</span>
@@ -413,6 +644,71 @@ export function GradeDetailPage() {
                 </button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Teacher Assignment Modal */}
+      {showTeacherModal && selectedSubject && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-800">
+                Assign Teacher to {selectedSubject.name}
+              </h2>
+              <button
+                onClick={() => setShowTeacherModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              {gradeName} • {selectedSubject.section} • {selectedYear}
+            </p>
+
+            {loadingTeachers ? (
+              <div className="text-center py-8">
+                <div className="animate-spin text-3xl mb-2">⏳</div>
+                <p className="text-gray-500">Loading teachers...</p>
+              </div>
+            ) : availableTeachers.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-2">👨‍🏫</div>
+                <p className="text-gray-700 font-medium mb-1">No available teachers</p>
+                <p className="text-sm text-gray-500">
+                  Teachers must have {selectedSubject.name} in their assigned subjects
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {availableTeachers.map((teacher) => (
+                  <button
+                    key={teacher.id}
+                    onClick={() => handleSelectTeacher(teacher.id)}
+                    className="w-full flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors text-left"
+                  >
+                    <img
+                      src={teacher.avatar_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(teacher.full_name)}&backgroundColor=transparent`}
+                      alt={teacher.full_name}
+                      className="w-10 h-10 rounded-full"
+                    />
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-800">{teacher.full_name}</p>
+                      <p className="text-sm text-gray-500">{teacher.email}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowTeacherModal(false)}
+              className="w-full mt-4 px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
