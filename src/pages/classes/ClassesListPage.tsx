@@ -41,9 +41,10 @@ export function ClassesListPage() {
   async function loadClasses() {
     setLoading(true)
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const token = localStorage.getItem('access_token')
     const response = await fetch(`${apiUrl}/api/classroom/classes`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       }
     })
@@ -57,10 +58,11 @@ export function ClassesListPage() {
 
   async function handleCreateClass() {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const token = localStorage.getItem('access_token')
     const response = await fetch(`${apiUrl}/api/classroom/classes`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(formData)
@@ -74,10 +76,11 @@ export function ClassesListPage() {
 
   async function handleJoinClass() {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const token = localStorage.getItem('access_token')
     const response = await fetch(`${apiUrl}/api/classroom/classes/join`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ class_code: joinCode })

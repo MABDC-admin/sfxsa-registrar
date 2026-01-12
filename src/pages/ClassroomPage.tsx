@@ -77,9 +77,10 @@ export function ClassroomPage() {
   
   async function loadClassData() {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const token = localStorage.getItem('access_token')
     const response = await fetch(`${apiUrl}/api/classroom/classes/${classId}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       }
     })
@@ -92,9 +93,10 @@ export function ClassroomPage() {
   
   async function loadTopics() {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const token = localStorage.getItem('access_token')
     const response = await fetch(`${apiUrl}/api/classroom/classes/${classId}/topics`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       }
     })
@@ -111,9 +113,10 @@ export function ClassroomPage() {
   
   async function loadLessons(topicId: string) {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const token = localStorage.getItem('access_token')
     const response = await fetch(`${apiUrl}/api/classroom/topics/${topicId}/lessons`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       }
     })
@@ -126,9 +129,10 @@ export function ClassroomPage() {
   
   async function loadAssignments() {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const token = localStorage.getItem('access_token')
     const response = await fetch(`${apiUrl}/api/classroom/classes/${classId}/assignments`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       }
     })
@@ -141,9 +145,10 @@ export function ClassroomPage() {
   
   async function loadMembers() {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const token = localStorage.getItem('access_token')
     const response = await fetch(`${apiUrl}/api/classroom/classes/${classId}/members`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       }
     })
@@ -168,10 +173,11 @@ export function ClassroomPage() {
   
   async function createTopic(title: string, description: string) {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const token = localStorage.getItem('access_token')
     await fetch(`${apiUrl}/api/classroom/classes/${classId}/topics`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ title, description, order_index: topics.length })
@@ -182,10 +188,11 @@ export function ClassroomPage() {
   
   async function createLesson(topicId: string, title: string, description: string) {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const token = localStorage.getItem('access_token')
     await fetch(`${apiUrl}/api/classroom/topics/${topicId}/lessons`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ title, description, class_id: classId })

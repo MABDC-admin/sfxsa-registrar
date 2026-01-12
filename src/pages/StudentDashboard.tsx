@@ -39,10 +39,11 @@ export function StudentDashboard() {
   async function loadData() {
     setLoading(true)
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const token = localStorage.getItem('access_token')
     try {
       const response = await fetch(`${apiUrl}/api/dashboard/stats?year=2025-2026&role=student`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       })
@@ -58,10 +59,11 @@ export function StudentDashboard() {
 
   async function loadClasses() {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const token = localStorage.getItem('access_token')
     try {
       const response = await fetch(`${apiUrl}/api/classroom/classes`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       })
@@ -78,11 +80,12 @@ export function StudentDashboard() {
     if (!joinCode.trim()) return
     
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const token = localStorage.getItem('access_token')
     try {
       const response = await fetch(`${apiUrl}/api/classroom/classes/join`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ class_code: joinCode })
