@@ -1,9 +1,10 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { api } from '../lib/apiClient'
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart, Line } from 'recharts'
 import { useAuth } from '../contexts/AuthContext'
 import { useSchoolYear } from '../contexts/SchoolYearContext'
 import { useRealtimeSubscription } from '../hooks/useRealtimeSubscription'
+import { useNavigate } from 'react-router-dom'
 
 // Counting animation hook
 function useCountAnimation(endValue: number, duration: number = 1500) {
@@ -39,8 +40,10 @@ function useCountAnimation(endValue: number, duration: number = 1500) {
 export function PrincipalDashboard() {
   const { profile } = useAuth()
   const { selectedYear, setSelectedYear, schoolYears } = useSchoolYear()
+  const navigate = useNavigate()
   const [showYearDropdown, setShowYearDropdown] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [menuPermissions, setMenuPermissions] = useState<Array<{menu_key: string, is_enabled: boolean}>>([])
 
   // KPI States
   const [studentCount, setStudentCount] = useState(0)
@@ -60,6 +63,42 @@ export function PrincipalDashboard() {
   const animatedSuggestions = useCountAnimation(pendingSuggestions)
 
   const initialLoadDone = useRef(false)
+
+  // Load module permissions for Principal role
+  useEffect(() => {
+    async function loadPermissions() {
+      if (!profile?.role) return
+      try {
+        const { data } = await api.from('role_module_permissions').select('*').eq('role', profile.role)
+        if (data) {
+          setMenuPermissions(data.map((p: any) => ({
+            menu_key: p.module_key,
+            is_enabled: p.is_enabled
+          })))
+        }
+      } catch (err) {
+        console.error('Error loading permissions:', err)
+      }
+    }
+    loadPermissions()
+  }, [profile?.role])
+
+  // Check if a module is enabled
+  const isModuleEnabled = useCallback((moduleKey: string): boolean => {
+    const permission = menuPermissions.find(p => p.menu_key === moduleKey)
+    return permission ? permission.is_enabled : true
+  }, [menuPermissions])
+
+  // Quick action links - only show enabled modules
+  const quickActions = useMemo(() => {
+    const allActions = [
+      { key: 'students', icon: '👤', label: 'Students', path: '/students' },
+      { key: 'teachers', icon: '👨‍🏫', label: 'Teachers', path: '/teachers' },
+      { key: 'admins', icon: '🛡️', label: 'Admins', path: '/admins' },
+      { key: 'reports', icon: '📊', label: 'Reports', path: '/reports' },
+    ]
+    return allActions.filter(action => isModuleEnabled(action.key))
+  }, [isModuleEnabled])
 
   const loadData = useCallback(async (isRealtime = false) => {
     if (!isRealtime && !initialLoadDone.current) {
@@ -326,13 +365,15 @@ export function PrincipalDashboard() {
                 ? `You have ${pendingSuggestions} suggestion(s) awaiting review`
                 : 'All suggestions have been reviewed'}
             </p>
-            <a 
-              href="/inbox" 
-              className="inline-block mt-3 text-sm font-medium hover:underline"
-              style={{ color: '#5B8C51' }}
-            >
-              View Inbox →
-            </a>
+            {isModuleEnabled('inbox') && (
+              <button
+                onClick={() => navigate('/inbox')}
+                className="inline-block mt-3 text-sm font-medium hover:underline cursor-pointer"
+                style={{ color: '#5B8C51' }}
+              >
+                View Inbox →
+              </button>
+            )}
           </div>
 
           {/* Monthly Collections */}
@@ -345,48 +386,39 @@ export function PrincipalDashboard() {
               ₱{recentPayments.toLocaleString()}
             </p>
             <p className="text-gray-500 text-sm mt-1">Payments received this month</p>
-            <a 
-              href="/finance" 
-              className="inline-block mt-3 text-sm font-medium hover:underline"
-              style={{ color: '#5B8C51' }}
-            >
-              View Finance →
-            </a>
+            {isModuleEnabled('finance') && (
+              <button
+                onClick={() => navigate('/finance')}
+                className="inline-block mt-3 text-sm font-medium hover:underline cursor-pointer"
+                style={{ color: '#5B8C51' }}
+              >
+                View Finance →
+              </button>
+            )}
           </div>
 
           {/* Quick Actions */}
           <div className="bg-white rounded-2xl p-5 shadow-sm">
             <h3 className="text-lg font-bold text-gray-800 mb-4">⚡ Quick Actions</h3>
-            <div className="grid grid-cols-2 gap-2">
-              <a 
-                href="/students"
-                className="flex items-center gap-2 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
-              >
-                <span>👤</span>
-                <span className="text-sm text-gray-700">Students</span>
-              </a>
-              <a 
-                href="/teachers"
-                className="flex items-center gap-2 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
-              >
-                <span>👨‍🏫</span>
-                <span className="text-sm text-gray-700">Teachers</span>
-              </a>
-              <a 
-                href="/admins"
-                className="flex items-center gap-2 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
-              >
-                <span>🛡️</span>
-                <span className="text-sm text-gray-700">Admins</span>
-              </a>
-              <a 
-                href="/reports"
-                className="flex items-center gap-2 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
-              >
-                <span>📊</span>
-                <span className="text-sm text-gray-700">Reports</span>
-              </a>
-            </div>
+            {quickActions.length > 0 ? (
+              <div className="grid grid-cols-2 gap-2">
+                {quickActions.map(action => (
+                  <button
+                    key={action.key}
+                    onClick={() => navigate(action.path)}
+                    className="flex items-center gap-2 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+                  >
+                    <span>{action.icon}</span>
+                    <span className="text-sm text-gray-700">{action.label}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-gray-400">
+                <p className="text-sm">No quick actions available</p>
+                <p className="text-xs mt-1">Modules may be disabled by admin</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
