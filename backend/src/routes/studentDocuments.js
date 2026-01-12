@@ -1,11 +1,11 @@
 import express from 'express';
 import pool from '../db.js';
-import { requireAuth } from '../middleware/auth.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // Get all documents for a student
-router.get('/student/:studentId', requireAuth, async (req, res) => {
+router.get('/student/:studentId', authenticateToken, async (req, res) => {
   try {
     const { studentId } = req.params;
     
@@ -35,7 +35,7 @@ router.get('/student/:studentId', requireAuth, async (req, res) => {
 });
 
 // Create/add a new student document
-router.post('/student/:studentId', requireAuth, async (req, res) => {
+router.post('/student/:studentId', authenticateToken, async (req, res) => {
   try {
     const { studentId } = req.params;
     const { name, category, file_path, file_type, file_size, blob_id } = req.body;
@@ -63,7 +63,7 @@ router.post('/student/:studentId', requireAuth, async (req, res) => {
 });
 
 // Update document metadata
-router.patch('/:documentId', requireAuth, async (req, res) => {
+router.patch('/:documentId', authenticateToken, async (req, res) => {
   try {
     const { documentId } = req.params;
     const { name, category } = req.body;
@@ -90,7 +90,7 @@ router.patch('/:documentId', requireAuth, async (req, res) => {
 });
 
 // Delete a document
-router.delete('/:documentId', requireAuth, async (req, res) => {
+router.delete('/:documentId', authenticateToken, async (req, res) => {
   try {
     const { documentId } = req.params;
     
@@ -129,7 +129,7 @@ router.delete('/:documentId', requireAuth, async (req, res) => {
 });
 
 // Get document statistics for a student
-router.get('/student/:studentId/stats', requireAuth, async (req, res) => {
+router.get('/student/:studentId/stats', authenticateToken, async (req, res) => {
   try {
     const { studentId } = req.params;
     
