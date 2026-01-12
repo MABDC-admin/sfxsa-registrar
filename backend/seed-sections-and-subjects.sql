@@ -59,7 +59,7 @@ DECLARE
     v_admin_id UUID;
 BEGIN
     -- Get Grade 1 Section A ID
-    SELECT id INTO v_section_id 
+    SELECT s.id INTO v_section_id 
     FROM sections s
     INNER JOIN grade_levels gl ON s.grade_level_id = gl.id
     WHERE gl.name = 'Grade 1' AND s.name = 'Section A'
@@ -118,5 +118,5 @@ SELECT
 FROM grade_levels gl
 LEFT JOIN sections s ON s.grade_level_id = gl.id
 LEFT JOIN classes c ON c.section_id = s.id
-GROUP BY gl.name, s.name
+GROUP BY gl.name, gl.order_index, s.name
 ORDER BY gl.order_index, s.name;

@@ -122,7 +122,7 @@ DECLARE
     v_admin_id UUID;
 BEGIN
     -- Get Grade 1 ID
-    SELECT id INTO v_grade1_id FROM grade_levels WHERE name = 'Grade 1';
+    SELECT gl.id INTO v_grade1_id FROM grade_levels gl WHERE gl.name = 'Grade 1';
     
     -- Get active academic year
     SELECT id INTO v_academic_year_id FROM academic_years WHERE is_active = true LIMIT 1;
