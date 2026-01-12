@@ -28,7 +28,7 @@ export function YouTubeEmbed({
   // Extract video ID from URL if provided
   let embedId = videoId
   if (url && !embedId) {
-    embedId = extractYouTubeId(url)
+    embedId = extractYouTubeId(url) || undefined
   }
 
   if (!embedId || error) {

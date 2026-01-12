@@ -179,7 +179,7 @@ export function StudentDetailModal({ student: initialStudent, onClose, onUpdate,
     setUploading(true)
     try {
       const fileExt = selectedFile.name.split('.').pop() || 'unknown'
-      const fileName = `${Date.now()}-${docName.replace(/\s+/g, '_')}.${fileExt}`
+      const _fileName = `${Date.now()}-${docName.replace(/\s+/g, '_')}.${fileExt}`
       // Upload to database-backed storage
       const { data: uploadData, error: uploadError } = await api.storage
         .from('db')

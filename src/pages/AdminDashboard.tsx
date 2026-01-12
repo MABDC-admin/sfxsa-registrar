@@ -52,7 +52,7 @@ export function AdminDashboard() {
   const [showYearDropdown, setShowYearDropdown] = useState(false)
   const currentUser = profile
   
-  const [years, setYears] = useState<AcademicYear[]>([])
+  const [_years, _setYears] = useState<AcademicYear[]>([])
   const [loading, setLoading] = useState(true)
   const [studentCount, setStudentCount] = useState(0)
   const [maleCount, setMaleCount] = useState(0)

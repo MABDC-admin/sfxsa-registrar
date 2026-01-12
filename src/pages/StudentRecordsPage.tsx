@@ -280,7 +280,7 @@ export function StudentRecordsPage() {
       const fullName = cols[nameIdx] || ''
       const birthDate = cols[birthIdx] || ''
       const ageStr = cols[ageIdx] || ''
-      const ageVal = ageStr !== '' ? (parseInt(ageStr) || null) : null
+      const _ageVal = ageStr !== '' ? (parseInt(ageStr) || null) : null
       const gender = cols[genderIdx] || ''
       const motherContact = cols[motherContactIdx] || ''
       const mothersMaidenName = cols[motherNameIdx] || ''

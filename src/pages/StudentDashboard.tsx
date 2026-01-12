@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/apiClient'
-import type { StudentKpis } from '../types'
+import type { StudentKpis as _StudentKpis } from '../types'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { useAuth } from '../contexts/AuthContext'
 import { getDemoUser } from '../lib/demoUser'
