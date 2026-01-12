@@ -1,459 +1,334 @@
 import { useEffect, useState, useCallback } from 'react'
-import { api } from '../../lib/apiClient'
-import { useRealtimeSubscription } from '../../hooks/useRealtimeSubscription'
-import { PageHeader, PageContainer, FilterBar } from '../../components/layout'
-import { 
-  Button, DataTable, FormModal, Input, Select, 
-  useToast, Badge, ConfirmDialog, Card
-} from '../../components/ui'
-import type { Column } from '../../components/ui'
+import { useNavigate } from 'react-router-dom'
 
 interface ClassItem {
   id: string
   name: string
+  subject_name: string
   grade_level: string
   section: string
+  description: string
   teacher_name: string
-  teacher_id?: string
+  teacher_avatar: string
+  class_code: string
   room: string
   schedule: string
-  max_students: number
   student_count: number
   is_active: boolean
 }
 
-const gradeLevelOptions = [
-  { value: 'Kindergarten', label: 'Kindergarten' },
-  { value: 'Grade 1', label: 'Grade 1' },
-  { value: 'Grade 2', label: 'Grade 2' },
-  { value: 'Grade 3', label: 'Grade 3' },
-  { value: 'Grade 4', label: 'Grade 4' },
-  { value: 'Grade 5', label: 'Grade 5' },
-  { value: 'Grade 6', label: 'Grade 6' },
-  { value: 'Grade 7', label: 'Grade 7' },
-  { value: 'Grade 8', label: 'Grade 8' },
-  { value: 'Grade 9', label: 'Grade 9' },
-  { value: 'Grade 10', label: 'Grade 10' },
-  { value: 'Grade 11', label: 'Grade 11' },
-  { value: 'Grade 12', label: 'Grade 12' },
-]
-
 export function ClassesListPage() {
-  const toast = useToast()
+  const navigate = useNavigate()
   const [classes, setClasses] = useState<ClassItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filters, setFilters] = useState<Record<string, string>>({})
-  const [showModal, setShowModal] = useState(false)
-  const [editingClass, setEditingClass] = useState<ClassItem | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; item: ClassItem | null }>({ open: false, item: null })
-  const [deleting, setDeleting] = useState(false)
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table')
-  const [teachers, setTeachers] = useState<Array<{ value: string; label: string }>>([])
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showJoinModal, setShowJoinModal] = useState(false)
+  const [joinCode, setJoinCode] = useState('')
   const [formData, setFormData] = useState({
     name: '',
+    subject_name: '',
     grade_level: 'Grade 1',
     section: '',
-    teacher_id: '',
+    description: '',
     room: '',
     schedule: '',
-    max_students: 40,
   })
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
-
-  const loadClasses = useCallback(async () => {
-    setLoading(true)
-    const { data } = await api
-      .from('classes')
-      .select(`
-        *,
-        teacher:teacher_id (
-          id,
-          full_name,
-          email,
-          avatar_url
-        )
-      `)
-      .order('name')
-
-    if (data) {
-      const formattedClasses: ClassItem[] = data.map((row: any) => ({
-        id: row.id,
-        name: row.name || '',
-        grade_level: row.grade_level || 'Grade 1',
-        section: row.section || '',
-        teacher_name: row.teacher?.full_name || 'Unassigned',
-        teacher_id: row.teacher_id,
-        room: row.room || '',
-        schedule: row.schedule || '',
-        max_students: row.max_students || 40,
-        student_count: row.student_count || 0,
-        is_active: row.is_active !== false,
-      }))
-      setClasses(formattedClasses)
-    } else {
-      setClasses([])
-    }
-    setLoading(false)
-  }, [])
 
   useEffect(() => {
     loadClasses()
-    loadTeachers()
-  }, [loadClasses])
+  }, [])
 
-  async function loadTeachers() {
-    const { data } = await api
-      .from('profiles')
-      .select('id, full_name')
-      .eq('role', 'teacher')
-      .eq('is_active', true)
-      .order('full_name')
-    
-    if (data) {
-      setTeachers([
-        { value: '', label: 'Unassigned' },
-        ...data.map((t: any) => ({ value: t.id, label: t.full_name }))
-      ])
-    }
-  }
-
-  useRealtimeSubscription({ table: 'classes' }, loadClasses, [])
-
-  const filteredClasses = classes.filter(c => {
-    const matchesSearch = !searchTerm || 
-      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.section.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesGrade = !filters.grade_level || filters.grade_level === '' || c.grade_level === filters.grade_level
-    return matchesSearch && matchesGrade
-  })
-
-  function openCreateModal() {
-    setEditingClass(null)
-    setFormData({ name: '', grade_level: 'Grade 1', section: '', teacher_id: '', room: '', schedule: '', max_students: 40 })
-    setFormErrors({})
-    setShowModal(true)
-  }
-
-  function openEditModal(cls: ClassItem) {
-    setEditingClass(cls)
-    setFormData({
-      name: cls.name,
-      grade_level: cls.grade_level,
-      section: cls.section,
-      teacher_id: cls.teacher_id || '',
-      room: cls.room,
-      schedule: cls.schedule,
-      max_students: cls.max_students,
-    })
-    setFormErrors({})
-    setShowModal(true)
-  }
-
-  function validateForm(): boolean {
-    const errors: Record<string, string> = {}
-    if (!formData.name.trim()) errors.name = 'Class name is required'
-    if (!formData.grade_level) errors.grade_level = 'Grade level is required'
-    setFormErrors(errors)
-    return Object.keys(errors).length === 0
-  }
-
-  async function handleSave() {
-    if (!validateForm()) return
-    setSaving(true)
-
-    try {
-      if (editingClass) {
-        const { error } = await api
-          .from('classes')
-          .update({
-            name: formData.name,
-            grade_level: formData.grade_level,
-            section: formData.section,
-            teacher_id: formData.teacher_id || null,
-            room: formData.room,
-            schedule: formData.schedule,
-            max_students: formData.max_students,
-          })
-          .eq('id', editingClass.id)
-
-        if (error) throw error
-        toast.success('Class updated successfully')
-      } else {
-        const { error } = await api
-          .from('classes')
-          .insert({
-            name: formData.name,
-            grade_level: formData.grade_level,
-            section: formData.section,
-            teacher_id: formData.teacher_id || null,
-            room: formData.room,
-            schedule: formData.schedule,
-            max_students: formData.max_students,
-            school_year: '2025-2026',
-            is_active: true,
-          })
-
-        if (error) throw error
-        toast.success('Class added successfully')
+  async function loadClasses() {
+    setLoading(true)
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const response = await fetch(`${apiUrl}/api/classroom/classes`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
       }
-      setShowModal(false)
+    })
+    
+    if (response.ok) {
+      const result = await response.json()
+      setClasses(result.data)
+    }
+    setLoading(false)
+  }
+
+  async function handleCreateClass() {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const response = await fetch(`${apiUrl}/api/classroom/classes`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(formData)
+    })
+    
+    if (response.ok) {
+      setShowCreateModal(false)
       loadClasses()
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to save class')
-    } finally {
-      setSaving(false)
     }
   }
 
-  async function handleDelete() {
-    if (!deleteConfirm.item) return
-    setDeleting(true)
-
-    try {
-      const { error } = await api
-        .from('classes')
-        .delete()
-        .eq('id', deleteConfirm.item.id)
-
-      if (error) throw error
-      toast.success('Class deleted successfully')
-      setDeleteConfirm({ open: false, item: null })
+  async function handleJoinClass() {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const response = await fetch(`${apiUrl}/api/classroom/classes/join`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ class_code: joinCode })
+    })
+    
+    if (response.ok) {
+      setShowJoinModal(false)
+      setJoinCode('')
       loadClasses()
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to delete class')
-    } finally {
-      setDeleting(false)
+    } else {
+      alert('Invalid class code')
     }
   }
 
-  const columns: Column<ClassItem>[] = [
-    {
-      key: 'name',
-      header: 'Class Name',
-      render: (row) => (
-        <div>
-          <p className="font-medium text-gray-900">{row.name}</p>
-          <p className="text-xs text-gray-500">{row.section || 'No section'}</p>
-        </div>
-      ),
-    },
-    {
-      key: 'grade_level',
-      header: 'Grade',
-      render: (row) => <Badge variant="primary">{row.grade_level}</Badge>,
-    },
-    {
-      key: 'teacher_name',
-      header: 'Teacher',
-      render: (row) => row.teacher_name || '-',
-    },
-    {
-      key: 'room',
-      header: 'Room',
-      render: (row) => row.room || '-',
-    },
-    {
-      key: 'student_count',
-      header: 'Students',
-      render: (row) => `${row.student_count}/${row.max_students}`,
-    },
-    {
-      key: 'is_active',
-      header: 'Status',
-      render: (row) => (
-        <Badge variant={row.is_active ? 'success' : 'default'} dot>
-          {row.is_active ? 'Active' : 'Inactive'}
-        </Badge>
-      ),
-    },
-    {
-      key: 'actions',
-      header: 'Actions',
-      sortable: false,
-      render: (row) => (
-        <div className="flex items-center gap-2">
-          <button
-            onClick={(e) => { e.stopPropagation(); openEditModal(row) }}
-            className="px-3 py-1 text-sm rounded-lg hover:bg-gray-100 text-primary-600"
-            style={{ color: '#5B8C51' }}
-          >
-            Edit
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ open: true, item: row }) }}
-            className="px-3 py-1 text-sm rounded-lg hover:bg-red-50 text-red-500"
-          >
-            Delete
-          </button>
-        </div>
-      ),
-    },
-  ]
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-gray-500">Loading classes...</div>
+      </div>
+    )
+  }
 
   return (
-    <PageContainer>
-      <PageHeader
-        title="Classes"
-        subtitle="Manage class sections and assignments"
-        icon="📚"
-        actions={
-          <div className="flex items-center gap-2">
-            <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800">My Classes</h1>
+            <p className="text-gray-600 mt-1">Manage your classes and assignments</p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowJoinModal(true)}
+              className="px-4 py-2 border-2 border-green-600 text-green-600 rounded-lg hover:bg-green-50 font-medium"
+            >
+              Join Class
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+            >
+              + Create Class
+            </button>
+          </div>
+        </div>
+
+        {classes.length === 0 ? (
+          <div className="bg-white rounded-lg shadow p-12 text-center">
+            <div className="text-6xl mb-4">📚</div>
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">No classes yet</h3>
+            <p className="text-gray-500 mb-6">Create a class or join one using a class code</p>
+            <div className="flex gap-3 justify-center">
               <button
-                onClick={() => setViewMode('table')}
-                className={`px-3 py-1.5 text-sm ${viewMode === 'table' ? 'bg-gray-100' : ''}`}
+                onClick={() => setShowJoinModal(true)}
+                className="px-6 py-3 border-2 border-green-600 text-green-600 rounded-lg hover:bg-green-50"
               >
-                📋
+                Join Class
               </button>
               <button
-                onClick={() => setViewMode('grid')}
-                className={`px-3 py-1.5 text-sm ${viewMode === 'grid' ? 'bg-gray-100' : ''}`}
+                onClick={() => setShowCreateModal(true)}
+                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
               >
-                📦
+                Create Class
               </button>
             </div>
-            <Button onClick={openCreateModal} icon="➕">
-              Add Class
-            </Button>
           </div>
-        }
-      />
-
-      <FilterBar
-        filters={[
-          { key: 'grade_level', label: 'Grade', type: 'select', options: gradeLevelOptions, placeholder: 'All Grades' },
-        ]}
-        values={filters}
-        onChange={(key, value) => setFilters({ ...filters, [key]: value })}
-        onClear={() => setFilters({})}
-        onSearch={setSearchTerm}
-        searchValue={searchTerm}
-        searchPlaceholder="Search classes..."
-        className="mb-6"
-      />
-
-      {viewMode === 'table' ? (
-        <DataTable
-          data={filteredClasses}
-          columns={columns}
-          loading={loading}
-          pagination
-          pageSize={10}
-          emptyIcon="📚"
-          emptyTitle="No classes found"
-          emptyDescription="Add your first class to get started."
-          emptyAction={<Button onClick={openCreateModal}>Add Class</Button>}
-        />
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredClasses.map((cls) => (
-            <Card key={cls.id} hover onClick={() => openEditModal(cls)}>
-              <div className="h-2 rounded-t-xl -mx-4 -mt-4 mb-4" style={{ backgroundColor: '#5B8C51' }} />
-              <h3 className="font-semibold text-gray-900">{cls.name}</h3>
-              <p className="text-sm text-gray-500 mb-3">{cls.section || 'No section'}</p>
-              <div className="space-y-2 text-sm text-gray-600">
-                <div className="flex justify-between">
-                  <span>Grade:</span>
-                  <Badge variant="primary" size="sm">{cls.grade_level}</Badge>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {classes.map((cls) => (
+              <div
+                key={cls.id}
+                onClick={() => navigate(`/classroom/${cls.id}`)}
+                className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer overflow-hidden"
+              >
+                <div className="h-24 bg-gradient-to-r from-green-500 to-green-600 p-4">
+                  <h3 className="text-white font-bold text-lg truncate">{cls.name}</h3>
+                  <p className="text-white/90 text-sm truncate">{cls.subject_name}</p>
                 </div>
-                <div className="flex justify-between">
-                  <span>Teacher:</span>
-                  <span>{cls.teacher_name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Students:</span>
-                  <span>{cls.student_count}/{cls.max_students}</span>
+                <div className="p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <img
+                      src={cls.teacher_avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${cls.teacher_name}`}
+                      alt={cls.teacher_name}
+                      className="w-8 h-8 rounded-full"
+                    />
+                    <span className="text-sm text-gray-600 truncate">{cls.teacher_name}</span>
+                  </div>
+                  <div className="space-y-1 text-sm text-gray-600">
+                    <div className="flex justify-between">
+                      <span>Students:</span>
+                      <span className="font-medium">{cls.student_count}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Room:</span>
+                      <span className="font-medium">{cls.room || 'N/A'}</span>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-3 border-t">
+                    <span className="text-xs text-gray-500">Class Code:</span>
+                    <span className="ml-2 text-sm font-mono font-semibold text-green-600">{cls.class_code}</span>
+                  </div>
                 </div>
               </div>
-              <div className="flex gap-2 mt-4 pt-4 border-t">
-                <Button variant="ghost" size="sm" fullWidth onClick={(e) => { e.stopPropagation(); openEditModal(cls) }}>
-                  Edit
-                </Button>
-                <Button variant="ghost" size="sm" fullWidth onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ open: true, item: cls }) }} className="text-red-500">
-                  Delete
-                </Button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Create Class Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-4">Create New Class</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Class Name *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., Mathematics 101"
+                  className="w-full px-4 py-2 border rounded-lg"
+                />
               </div>
-            </Card>
-          ))}
+              <div>
+                <label className="block text-sm font-medium mb-1">Subject</label>
+                <input
+                  type="text"
+                  value={formData.subject_name}
+                  onChange={(e) => setFormData({ ...formData, subject_name: e.target.value })}
+                  placeholder="e.g., Mathematics"
+                  className="w-full px-4 py-2 border rounded-lg"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Grade Level *</label>
+                  <select
+                    value={formData.grade_level}
+                    onChange={(e) => setFormData({ ...formData, grade_level: e.target.value })}
+                    className="w-full px-4 py-2 border rounded-lg"
+                  >
+                    <option>Grade 1</option>
+                    <option>Grade 2</option>
+                    <option>Grade 3</option>
+                    <option>Grade 4</option>
+                    <option>Grade 5</option>
+                    <option>Grade 6</option>
+                    <option>Grade 7</option>
+                    <option>Grade 8</option>
+                    <option>Grade 9</option>
+                    <option>Grade 10</option>
+                    <option>Grade 11</option>
+                    <option>Grade 12</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Section</label>
+                  <input
+                    type="text"
+                    value={formData.section}
+                    onChange={(e) => setFormData({ ...formData, section: e.target.value })}
+                    placeholder="e.g., Section A"
+                    className="w-full px-4 py-2 border rounded-lg"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Description</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Class description"
+                  className="w-full px-4 py-2 border rounded-lg h-24"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Room</label>
+                  <input
+                    type="text"
+                    value={formData.room}
+                    onChange={(e) => setFormData({ ...formData, room: e.target.value })}
+                    placeholder="e.g., Room 101"
+                    className="w-full px-4 py-2 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Schedule</label>
+                  <input
+                    type="text"
+                    value={formData.schedule}
+                    onChange={(e) => setFormData({ ...formData, schedule: e.target.value })}
+                    placeholder="e.g., MWF 9-10am"
+                    className="w-full px-4 py-2 border rounded-lg"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateClass}
+                disabled={!formData.name || !formData.grade_level}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Create Class
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Create/Edit Modal */}
-      <FormModal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        onSubmit={handleSave}
-        title={editingClass ? 'Edit Class' : 'Add New Class'}
-        submitText={editingClass ? 'Update' : 'Add Class'}
-        submitLoading={saving}
-      >
-        <div className="space-y-4">
-          <Input
-            label="Class Name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            error={formErrors.name}
-            placeholder="e.g., Mathematics 101"
-            required
-          />
-          <div className="grid grid-cols-2 gap-4">
-            <Select
-              label="Grade Level"
-              value={formData.grade_level}
-              onChange={(value) => setFormData({ ...formData, grade_level: value })}
-              options={gradeLevelOptions}
-              error={formErrors.grade_level}
+      {/* Join Class Modal */}
+      {showJoinModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-2xl font-bold mb-4">Join Class</h2>
+            <p className="text-gray-600 mb-4">Enter the class code provided by your teacher</p>
+            <input
+              type="text"
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              placeholder="CLASS CODE"
+              className="w-full px-4 py-3 border rounded-lg font-mono text-center text-lg mb-4 uppercase"
+              maxLength={8}
             />
-            <Input
-              label="Section"
-              value={formData.section}
-              onChange={(e) => setFormData({ ...formData, section: e.target.value })}
-              placeholder="e.g., Section A"
-            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowJoinModal(false)}
+                className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleJoinClass}
+                disabled={joinCode.length < 6}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Join
+              </button>
+            </div>
           </div>
-          <Select
-            label="Assign Teacher"
-            value={formData.teacher_id}
-            onChange={(value) => setFormData({ ...formData, teacher_id: value })}
-            options={teachers}
-            placeholder="Select a teacher"
-          />
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Room"
-              value={formData.room}
-              onChange={(e) => setFormData({ ...formData, room: e.target.value })}
-              placeholder="e.g., Room 101"
-            />
-            <Input
-              label="Max Students"
-              type="number"
-              value={String(formData.max_students)}
-              onChange={(e) => setFormData({ ...formData, max_students: parseInt(e.target.value) || 40 })}
-            />
-          </div>
-          <Input
-            label="Schedule"
-            value={formData.schedule}
-            onChange={(e) => setFormData({ ...formData, schedule: e.target.value })}
-            placeholder="e.g., MWF 9:00-10:00 AM"
-          />
         </div>
-      </FormModal>
-
-      {/* Delete Confirmation */}
-      <ConfirmDialog
-        isOpen={deleteConfirm.open}
-        onConfirm={handleDelete}
-        onCancel={() => setDeleteConfirm({ open: false, item: null })}
-        title="Delete Class?"
-        message={`Are you sure you want to delete ${deleteConfirm.item?.name}? This will remove all associated data.`}
-        confirmText="Delete"
-        variant="danger"
-        loading={deleting}
-      />
-    </PageContainer>
+      )}
+    </div>
   )
 }
+

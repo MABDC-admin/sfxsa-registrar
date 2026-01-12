@@ -70,7 +70,7 @@ function App() {
               {/* Grade Levels */}
               <Route path="/grade-levels" element={<GradeLevelsPage />} />
               <Route path="/grade-levels/:gradeId" element={<GradeDetailPage />} />
-              <Route path="/classroom/:subjectId" element={<ClassroomPage />} />
+              <Route path="/classroom/:classId" element={<ClassroomPage />} />
 
               {/* Student Records - Consolidated student management */}
               <Route path="/records" element={<StudentRecordsPage />} />

@@ -1,162 +1,550 @@
-import { useState, useEffect } from 'react'
-import { useParams, Link, useSearchParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../lib/apiClient'
-import { AnnouncementsTab } from '../components/classroom/AnnouncementsTab'
-import { ClassworkTab } from '../components/classroom/ClassworkTab'
-import { PeopleTab } from '../components/classroom/PeopleTab'
-import { AttendanceTab } from '../components/classroom/AttendanceTab'
-import { GradesTab } from '../components/classroom/GradesTab'
 
-type TabType = 'announcements' | 'classwork' | 'people' | 'attendance' | 'grades'
-
-const subjectColors: { [key: string]: string } = {
-  'English': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  'Mathematics': 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-  'Science': 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-  'Filipino': 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-  'Social Studies': 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-  'MAPEH': 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
-  'TLE': 'linear-gradient(135deg, #d299c2 0%, #fef9d7 100%)',
-  'Values Education': 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
+interface ClassData {
+  id: string
+  name: string
+  subject_name: string
+  description: string
+  teacher_name: string
+  teacher_email: string
+  teacher_avatar: string
+  class_code: string
+  room: string
+  schedule: string
+  student_count: number
 }
 
-const subjectIcons: { [key: string]: string } = {
-  'English': '📗',
-  'Mathematics': '🔢',
-  'Science': '🔬',
-  'Filipino': '🇵🇭',
-  'Social Studies': '🌍',
-  'MAPEH': '🎨',
-  'TLE': '🔧',
-  'Values Education': '💝',
+interface Topic {
+  id: string
+  title: string
+  description: string
+  order_index: number
+}
+
+interface Lesson {
+  id: string
+  topic_id: string
+  title: string
+  description: string
+}
+
+interface Material {
+  id: string
+  lesson_id?: string
+  topic_id?: string
+  title: string
+  description: string
+  type: string
+  file_url: string
+  creator_name: string
+}
+
+interface Assignment {
+  id: string
+  topic_id?: string
+  title: string
+  description: string
+  due_date: string
+  points_possible: number
+  submission_count: number
+}
+
+interface Member {
+  id: string
+  user_id: string
+  full_name: string
+  email: string
+  avatar_url: string
+  role: string
+  joined_at: string
+}
+
+interface Submission {
+  id: string
+  student_id: string
+  student_name: string
+  student_email: string
+  grade?: number
+  status: string
+  submitted_at: string
 }
 
 export function ClassroomPage() {
-  const { subjectId } = useParams()
-  const [searchParams] = useSearchParams()
-  const [activeTab, setActiveTab] = useState<TabType>('announcements')
+  const { classId } = useParams()
+  const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState<'classwork' | 'people' | 'grades'>('classwork')
+  const [classData, setClassData] = useState<ClassData | null>(null)
+  const [topics, setTopics] = useState<Topic[]>([])
+  const [lessons, setLessons] = useState<Record<string, Lesson[]>>({})
+  const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
-  const [subject, setSubject] = useState({
-    id: subjectId || '',
-    name: 'Subject',
-    section: 'Section A',
-    grade: 'Grade 1',
-    color: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
-  })
-
+  const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set())
+  
+  // Modals
+  const [showTopicModal, setShowTopicModal] = useState(false)
+  const [showLessonModal, setShowLessonModal] = useState(false)
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false)
+  const [selectedTopicId, setSelectedTopicId] = useState<string>('')
+  
   useEffect(() => {
     loadClassData()
-  }, [subjectId])
-
+    loadTopics()
+    loadAssignments()
+    loadMembers()
+  }, [classId])
+  
   async function loadClassData() {
-    setLoading(true)
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const response = await fetch(`${apiUrl}/api/classroom/classes/${classId}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      }
+    })
     
-    // Get from URL params first (passed from GradeDetailPage)
-    const gradeParam = searchParams.get('grade')
-    const subjectParam = searchParams.get('subject')
-    const sectionParam = searchParams.get('section')
-
-    if (gradeParam && subjectParam) {
-      setSubject({
-        id: subjectId || '',
-        name: subjectParam,
-        section: sectionParam || 'Section A',
-        grade: gradeParam,
-        color: subjectColors[subjectParam] || subjectColors['English']
-      })
-      setLoading(false)
-      return
+    if (response.ok) {
+      const result = await response.json()
+      setClassData(result.data)
     }
-
-    // Otherwise try to fetch from database
-    const { data: classData } = await api
-      .from('classes')
-      .select(`
-        id,
-        subject_name,
-        sections(
-          name,
-          grade_levels(name)
-        )
-      `)
-      .eq('id', subjectId)
-      .single()
-
-    if (classData) {
-      setSubject({
-        id: classData.id,
-        name: classData.subject_name,
-        section: (classData.sections as any)?.name || 'Section A',
-        grade: (classData.sections as any)?.grade_levels?.name || 'Grade 1',
-        color: subjectColors[classData.subject_name] || subjectColors['English']
-      })
+  }
+  
+  async function loadTopics() {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const response = await fetch(`${apiUrl}/api/classroom/classes/${classId}/topics`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (response.ok) {
+      const result = await response.json()
+      setTopics(result.data)
+      
+      // Load lessons for each topic
+      result.data.forEach((topic: Topic) => loadLessons(topic.id))
     }
-
     setLoading(false)
   }
-
-  const tabs: { id: TabType; label: string; icon: string }[] = [
-    { id: 'announcements', label: 'Announcements', icon: '📢' },
-    { id: 'classwork', label: 'Classwork', icon: '📚' },
-    { id: 'attendance', label: 'Attendance', icon: '✅' },
-    { id: 'grades', label: 'Grades', icon: '📊' },
-    { id: 'people', label: 'People', icon: '👥' },
-  ]
-
-  const subjectIcon = subjectIcons[subject.name] || '📚'
-
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: '#F8FAF7' }}>
-        <div className="text-gray-500">Loading class...</div>
-      </div>
-    )
+  
+  async function loadLessons(topicId: string) {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const response = await fetch(`${apiUrl}/api/classroom/topics/${topicId}/lessons`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (response.ok) {
+      const result = await response.json()
+      setLessons(prev => ({ ...prev, [topicId]: result.data }))
+    }
   }
-
+  
+  async function loadAssignments() {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const response = await fetch(`${apiUrl}/api/classroom/classes/${classId}/assignments`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (response.ok) {
+      const result = await response.json()
+      setAssignments(result.data)
+    }
+  }
+  
+  async function loadMembers() {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    const response = await fetch(`${apiUrl}/api/classroom/classes/${classId}/members`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (response.ok) {
+      const result = await response.json()
+      setMembers(result.data)
+    }
+  }
+  
+  function toggleTopic(topicId: string) {
+    setExpandedTopics(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(topicId)) {
+        newSet.delete(topicId)
+      } else {
+        newSet.add(topicId)
+      }
+      return newSet
+    })
+  }
+  
+  async function createTopic(title: string, description: string) {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    await fetch(`${apiUrl}/api/classroom/classes/${classId}/topics`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ title, description, order_index: topics.length })
+    })
+    loadTopics()
+    setShowTopicModal(false)
+  }
+  
+  async function createLesson(topicId: string, title: string, description: string) {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    await fetch(`${apiUrl}/api/classroom/topics/${topicId}/lessons`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ title, description, class_id: classId })
+    })
+    loadLessons(topicId)
+    setShowLessonModal(false)
+  }
+  
+  if (loading || !classData) {
+    return <div className="flex items-center justify-center h-screen">Loading...</div>
+  }
+  
   return (
-    <div className="flex-1 flex flex-col" style={{ backgroundColor: '#F8FAF7' }}>
-      {/* Header Banner */}
-      <div 
-        className="p-6 text-white relative overflow-hidden"
-        style={{ background: subject.color, minHeight: '160px' }}
-      >
-        <Link to="/grade-levels" className="text-white/80 hover:text-white text-sm mb-2 inline-block">
-          ← Back to Grade Levels
-        </Link>
-        <h1 className="text-3xl font-bold mt-2">{subject.name}</h1>
-        <p className="text-white/80">{subject.section} • {subject.grade}</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-green-600 to-green-700 text-white">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <button 
+            onClick={() => navigate('/classes')}
+            className="mb-4 text-white/80 hover:text-white flex items-center gap-2"
+          >
+            ← Back to Classes
+          </button>
+          <h1 className="text-3xl font-bold">{classData.name}</h1>
+          <p className="text-white/90 mt-1">{classData.subject_name}</p>
+          <div className="flex items-center gap-6 mt-4 text-sm">
+            <span>{classData.room}</span>
+            <span>{classData.schedule}</span>
+            <span>{classData.student_count} students</span>
+            <span className="ml-auto font-mono bg-white/20 px-3 py-1 rounded">Code: {classData.class_code}</span>
+          </div>
+        </div>
         
-        {/* Decorative */}
-        <div className="absolute right-8 bottom-4 text-8xl opacity-20">{subjectIcon}</div>
-      </div>
-
-      {/* Tabs */}
-      <div className="bg-white border-b border-gray-200 px-6">
-        <div className="flex gap-1">
-          {tabs.map((tab) => (
+        {/* Tabs */}
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex gap-8 border-b border-white/20">
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === tab.id
-                  ? 'border-green-600 text-green-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-800'
+              onClick={() => setActiveTab('classwork')}
+              className={`pb-4 font-medium transition-colors ${
+                activeTab === 'classwork' 
+                  ? 'border-b-2 border-white text-white' 
+                  : 'text-white/70 hover:text-white'
               }`}
             >
-              <span>{tab.icon}</span>
-              {tab.label}
+              Classwork
             </button>
-          ))}
+            <button
+              onClick={() => setActiveTab('people')}
+              className={`pb-4 font-medium transition-colors ${
+                activeTab === 'people' 
+                  ? 'border-b-2 border-white text-white' 
+                  : 'text-white/70 hover:text-white'
+              }`}
+            >
+              People
+            </button>
+            <button
+              onClick={() => setActiveTab('grades')}
+              className={`pb-4 font-medium transition-colors ${
+                activeTab === 'grades' 
+                  ? 'border-b-2 border-white text-white' 
+                  : 'text-white/70 hover:text-white'
+              }`}
+            >
+              Grades
+            </button>
+          </div>
         </div>
       </div>
+      
+      {/* Content */}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {activeTab === 'classwork' && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">Classwork</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowTopicModal(true)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  + Add Topic
+                </button>
+                <button
+                  onClick={() => setShowAssignmentModal(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  + Create Assignment
+                </button>
+              </div>
+            </div>
+            
+            {topics.map(topic => (
+              <div key={topic.id} className="bg-white rounded-lg shadow">
+                <button
+                  onClick={() => toggleTopic(topic.id)}
+                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={`transform transition-transform ${expandedTopics.has(topic.id) ? 'rotate-90' : ''}`}>
+                      ▶
+                    </span>
+                    <div className="text-left">
+                      <h3 className="font-semibold text-lg">{topic.title}</h3>
+                      {topic.description && (
+                        <p className="text-sm text-gray-600">{topic.description}</p>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedTopicId(topic.id)
+                      setShowLessonModal(true)
+                    }}
+                    className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+                  >
+                    + Add Lesson
+                  </button>
+                </button>
+                
+                {expandedTopics.has(topic.id) && (
+                  <div className="px-6 pb-4 space-y-3">
+                    {lessons[topic.id]?.map(lesson => (
+                      <div key={lesson.id} className="ml-8 p-4 bg-gray-50 rounded-lg">
+                        <h4 className="font-medium">{lesson.title}</h4>
+                        {lesson.description && (
+                          <p className="text-sm text-gray-600 mt-1">{lesson.description}</p>
+                        )}
+                      </div>
+                    ))}
+                    
+                    {assignments.filter(a => a.topic_id === topic.id).map(assignment => (
+                      <div key={assignment.id} className="ml-8 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-medium">📝 {assignment.title}</h4>
+                            <p className="text-sm text-gray-600 mt-1">{assignment.description}</p>
+                            <div className="flex gap-4 mt-2 text-sm text-gray-500">
+                              <span>Due: {new Date(assignment.due_date).toLocaleDateString()}</span>
+                              <span>{assignment.points_possible} points</span>
+                              <span>{assignment.submission_count} submissions</span>
+                            </div>
+                          </div>
+                          <button className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+                            View
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+            
+            {topics.length === 0 && (
+              <div className="text-center py-12 bg-white rounded-lg">
+                <p className="text-gray-500">No topics yet. Create one to get started!</p>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {activeTab === 'people' && (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold">People</h2>
+            
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="font-semibold text-lg mb-4">Teachers</h3>
+              <div className="space-y-3">
+                {members.filter(m => m.role === 'teacher').map(member => (
+                  <div key={member.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded">
+                    <img 
+                      src={member.avatar_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${member.full_name}`}
+                      alt={member.full_name}
+                      className="w-10 h-10 rounded-full"
+                    />
+                    <div>
+                      <p className="font-medium">{member.full_name}</p>
+                      <p className="text-sm text-gray-500">{member.email}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="font-semibold text-lg mb-4">Students ({members.filter(m => m.role === 'student').length})</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {members.filter(m => m.role === 'student').map(member => (
+                  <div key={member.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded">
+                    <img 
+                      src={member.avatar_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${member.full_name}`}
+                      alt={member.full_name}
+                      className="w-10 h-10 rounded-full"
+                    />
+                    <div>
+                      <p className="font-medium">{member.full_name}</p>
+                      <p className="text-sm text-gray-500">{member.email}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {activeTab === 'grades' && (
+          <div>
+            <h2 className="text-2xl font-bold mb-6">Grades</h2>
+            <div className="bg-white rounded-lg shadow overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-sm font-semibold">Student</th>
+                    {assignments.slice(0, 5).map(a => (
+                      <th key={a.id} className="px-4 py-3 text-left text-sm font-semibold">
+                        {a.title}
+                      </th>
+                    ))}
+                    <th className="px-6 py-3 text-left text-sm font-semibold">Average</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {members.filter(m => m.role === 'student').map(member => (
+                    <tr key={member.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <img 
+                            src={member.avatar_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${member.full_name}`}
+                            alt={member.full_name}
+                            className="w-8 h-8 rounded-full"
+                          />
+                          <span className="font-medium">{member.full_name}</span>
+                        </div>
+                      </td>
+                      {assignments.slice(0, 5).map(a => (
+                        <td key={a.id} className="px-4 py-4 text-center">
+                          <span className="text-gray-400">-</span>
+                        </td>
+                      ))}
+                      <td className="px-6 py-4 text-center font-medium">
+                        <span className="text-gray-400">-</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Create Topic Modal */}
+      {showTopicModal && (
+        <TopicModal
+          onClose={() => setShowTopicModal(false)}
+          onSave={(title, description) => createTopic(title, description)}
+        />
+      )}
+      
+      {/* Create Lesson Modal */}
+      {showLessonModal && (
+        <LessonModal
+          topicId={selectedTopicId}
+          onClose={() => setShowLessonModal(false)}
+          onSave={(title, description) => createLesson(selectedTopicId, title, description)}
+        />
+      )}
+    </div>
+  )
+}
 
-      {/* Tab Content */}
-      <div className="flex-1 overflow-auto">
-        {activeTab === 'announcements' && <AnnouncementsTab subjectId={subjectId || ''} />}
-        {activeTab === 'classwork' && <ClassworkTab subjectId={subjectId || ''} />}
-        {activeTab === 'attendance' && <AttendanceTab classId={subjectId || ''} />}
-        {activeTab === 'grades' && <GradesTab classId={subjectId || ''} />}
-        {activeTab === 'people' && <PeopleTab subjectId={subjectId || ''} gradeLevel={subject.grade} />}
+function TopicModal({ onClose, onSave }: { onClose: () => void, onSave: (title: string, desc: string) => void }) {
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h3 className="text-xl font-bold mb-4">Create Topic</h3>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Topic title"
+          className="w-full px-4 py-2 border rounded-lg mb-3"
+        />
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Description (optional)"
+          className="w-full px-4 py-2 border rounded-lg mb-4 h-24"
+        />
+        <div className="flex gap-2 justify-end">
+          <button onClick={onClose} className="px-4 py-2 border rounded-lg">Cancel</button>
+          <button 
+            onClick={() => onSave(title, description)}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LessonModal({ topicId, onClose, onSave }: { topicId: string, onClose: () => void, onSave: (title: string, desc: string) => void }) {
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h3 className="text-xl font-bold mb-4">Create Lesson</h3>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Lesson title"
+          className="w-full px-4 py-2 border rounded-lg mb-3"
+        />
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Description (optional)"
+          className="w-full px-4 py-2 border rounded-lg mb-4 h-24"
+        />
+        <div className="flex gap-2 justify-end">
+          <button onClick={onClose} className="px-4 py-2 border rounded-lg">Cancel</button>
+          <button 
+            onClick={() => onSave(title, description)}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
+            Create
+          </button>
+        </div>
       </div>
     </div>
   )
