@@ -259,7 +259,7 @@ export function StudentRecordsPage() {
     const levelIdx = headers.findIndex(h => h === 'grade level' || h === 'level')
     const nameIdx = headers.findIndex(h => h === 'student name' || h.includes('student_name') || h.includes('name'))
     const birthIdx = headers.findIndex(h => h === 'birth date' || h.includes('birth'))
-    const ageIdx = headers.findIndex(h => h === 'age')
+    // const ageIdx = headers.findIndex(h => h === 'age')
     const genderIdx = headers.findIndex(h => h === 'gender')
     const motherContactIdx = headers.findIndex(h => h === 'mother contact' || h.includes('mother contact'))
     const motherNameIdx = headers.findIndex(h => h === 'mothers maiden name' || (h.includes('mother') && h.includes('maiden')))
