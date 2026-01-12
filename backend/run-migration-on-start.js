@@ -124,6 +124,23 @@ export async function runMigrations() {
 
     console.log('✅ Classes table structure updated successfully!');
 
+    // Migration 3: Seed sections if they don't exist
+    console.log('📝 Checking sections data...');
+    const sectionsCheck = await pool.query('SELECT COUNT(*) FROM sections');
+    const sectionsCount = parseInt(sectionsCheck.rows[0].count);
+
+    if (sectionsCount === 0) {
+      console.log('📝 Creating default sections for all grade levels...');
+      await pool.query(`
+        INSERT INTO sections (name, grade_level_id)
+        SELECT 'Section A', id FROM grade_levels
+        ON CONFLICT DO NOTHING;
+      `);
+      console.log('✅ Default sections created!');
+    } else {
+      console.log(`✅ Sections already exist (${sectionsCount} sections)`);
+    }
+
   } catch (error) {
     console.error('❌ Migration error:', error.message);
     // Don't fail startup, just log the error
