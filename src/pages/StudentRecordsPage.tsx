@@ -279,7 +279,7 @@ export function StudentRecordsPage() {
       const gradeLevel = cols[levelIdx] || 'Kindergarten'
       const fullName = cols[nameIdx] || ''
       const birthDate = cols[birthIdx] || ''
-      const ageStr = cols[ageIdx] || ''
+      // const ageStr = cols[ageIdx] || ''
       // const ageVal = ageStr !== '' ? (parseInt(ageStr) || null) : null
       const gender = cols[genderIdx] || ''
       const motherContact = cols[motherContactIdx] || ''
