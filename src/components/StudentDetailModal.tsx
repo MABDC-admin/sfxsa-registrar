@@ -98,7 +98,7 @@ export function StudentDetailModal({ student: initialStudent, onClose, onUpdate,
       try {
         const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/student-documents/student/${student.id}`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
             'Content-Type': 'application/json'
           }
         })
@@ -242,7 +242,7 @@ export function StudentDetailModal({ student: initialStudent, onClose, onUpdate,
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/student-documents/student/${student.id}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(docData)
@@ -284,7 +284,7 @@ export function StudentDetailModal({ student: initialStudent, onClose, onUpdate,
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/student-documents/${doc.id}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
           'Content-Type': 'application/json'
         }
       })
