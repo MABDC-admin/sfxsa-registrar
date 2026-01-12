@@ -30,7 +30,7 @@ const defaultMenuItems: MenuItem[] = [
   { icon: '🎓', label: 'Principals', path: '/principals', key: 'principals', roles: ['admin'] },
   { icon: '📝', label: 'Registrars', path: '/registrars', key: 'registrars', roles: ['admin'] },
   { icon: '💰', label: 'Accounting', path: '/accounting-users', key: 'accounting-users', roles: ['admin'] },
-  { icon: '📖', label: 'Classes', path: '/classes', key: 'classes', roles: ['admin', 'teacher', 'principal', 'registrar'] },
+  { icon: '📖', label: 'Classes', path: '/classes', key: 'classes', roles: ['admin', 'teacher', 'student', 'principal', 'registrar'] },
   { icon: '✅', label: 'Attendance', path: '/attendance', key: 'attendance', roles: ['admin', 'teacher', 'principal', 'registrar'] },
   { icon: '📆', label: 'Calendar', path: '/calendar', key: 'calendar', roles: ['admin', 'teacher', 'student', 'principal', 'registrar', 'accounting'] },
   { icon: '💬', label: 'Chat', path: '/chat', key: 'chat', roles: ['admin', 'teacher', 'finance', 'principal', 'registrar', 'accounting'] },

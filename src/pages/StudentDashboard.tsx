@@ -1,12 +1,25 @@
 import { useEffect, useState } from 'react'
-import { api } from '../lib/apiClient'
+import { useNavigate } from 'react-router-dom'
 import type { StudentKpis as _StudentKpis } from '../types'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { useAuth } from '../contexts/AuthContext'
 import { getDemoUser } from '../lib/demoUser'
 
+interface ClassItem {
+  id: string
+  name: string
+  subject_name: string
+  grade_level: string
+  section: string
+  teacher_name: string
+  teacher_avatar: string
+  class_code: string
+  room: string
+}
+
 export function StudentDashboard() {
   const { profile } = useAuth()
+  const navigate = useNavigate()
   
   // Check for demo user
   const demoUser = getDemoUser()
@@ -14,18 +27,79 @@ export function StudentDashboard() {
 
   const [kpis, setKpis] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [classes, setClasses] = useState<ClassItem[]>([])
+  const [showJoinModal, setShowJoinModal] = useState(false)
+  const [joinCode, setJoinCode] = useState('')
 
   useEffect(() => {
-    async function loadData() {
-      setLoading(true)
-      const { data, error } = await api.dashboard.getStats('2025-2026', 'student');
-      if (data && !error) {
-        setKpis(data.student)
-      }
-      setLoading(false)
-    }
     loadData()
+    loadClasses()
   }, [])
+
+  async function loadData() {
+    setLoading(true)
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    try {
+      const response = await fetch(`${apiUrl}/api/dashboard/stats?year=2025-2026&role=student`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (response.ok) {
+        const result = await response.json()
+        setKpis(result.data?.student)
+      }
+    } catch (error) {
+      console.error('Error loading dashboard stats:', error)
+    }
+    setLoading(false)
+  }
+
+  async function loadClasses() {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    try {
+      const response = await fetch(`${apiUrl}/api/classroom/classes`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      if (response.ok) {
+        const result = await response.json()
+        setClasses(result.data || [])
+      }
+    } catch (error) {
+      console.error('Error loading classes:', error)
+    }
+  }
+
+  async function handleJoinClass() {
+    if (!joinCode.trim()) return
+    
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+    try {
+      const response = await fetch(`${apiUrl}/api/classroom/classes/join`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ class_code: joinCode })
+      })
+      
+      if (response.ok) {
+        setShowJoinModal(false)
+        setJoinCode('')
+        loadClasses()
+      } else {
+        alert('Invalid class code')
+      }
+    } catch (error) {
+      console.error('Error joining class:', error)
+      alert('Failed to join class')
+    }
+  }
 
   const gradeData = [
     { name: 'Sno', value: 45 }, { name: 'Me', value: 38 }, { name: 'Abo', value: 42 },
@@ -119,18 +193,54 @@ export function StudentDashboard() {
 
       {/* Middle Row */}
       <div className="grid grid-cols-12 gap-6 mb-6">
+        {/* My Classes Section */}
         <div className="col-span-5 bg-white rounded-2xl p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">Grade Progress Per Subject</h3>
+            <h3 className="text-lg font-semibold text-gray-800">My Classes</h3>
+            <button
+              onClick={() => setShowJoinModal(true)}
+              className="px-3 py-1.5 text-sm font-medium rounded-lg border-2"
+              style={{ borderColor: '#5B8C51', color: '#5B8C51' }}
+            >
+              + Join Class
+            </button>
           </div>
-          <ResponsiveContainer width="100%" height={180}>
-            <LineChart data={gradeData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} domain={[20, 60]} ticks={[30, 50]} tickFormatter={(v) => `${v}%`} />
-              <Line type="monotone" dataKey="value" stroke="#5B8C51" strokeWidth={2} dot={{ fill: '#5B8C51', r: 4 }} />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="space-y-3 max-h-[240px] overflow-y-auto">
+            {classes.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p className="text-sm">No classes yet</p>
+                <p className="text-xs mt-1">Join a class using a class code</p>
+              </div>
+            ) : (
+              classes.slice(0, 4).map((cls) => (
+                <div
+                  key={cls.id}
+                  onClick={() => navigate(`/classroom/${cls.id}`)}
+                  className="p-3 rounded-xl border border-gray-100 hover:border-green-200 hover:bg-green-50 cursor-pointer transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white" style={{ backgroundColor: '#5B8C51' }}>
+                      📖
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{cls.name}</p>
+                      <p className="text-xs text-gray-500 truncate">{cls.teacher_name} • {cls.room || 'No room'}</p>
+                    </div>
+                    <span className="text-gray-400 text-sm">›</span>
+                  </div>
+                </div>
+              ))
+            )}
+            {classes.length > 4 && (
+              <button
+                onClick={() => navigate('/classes')}
+                className="w-full py-2 text-sm text-center rounded-lg hover:bg-gray-50 transition-colors"
+                style={{ color: '#5B8C51' }}
+              >
+                View All {classes.length} Classes →
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="col-span-4 bg-white rounded-2xl p-5 shadow-sm">
@@ -214,6 +324,44 @@ export function StudentDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Join Class Modal */}
+      {showJoinModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-2xl font-bold mb-4">Join Class</h2>
+            <p className="text-gray-600 mb-4">Enter the class code provided by your teacher</p>
+            <input
+              type="text"
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              placeholder="CLASS CODE"
+              className="w-full px-4 py-3 border rounded-lg font-mono text-center text-lg mb-4 uppercase"
+              maxLength={8}
+              autoFocus
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowJoinModal(false)
+                  setJoinCode('')
+                }}
+                className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleJoinClass}
+                disabled={joinCode.length < 6}
+                className="flex-1 px-4 py-2 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: '#5B8C51' }}
+              >
+                Join
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
