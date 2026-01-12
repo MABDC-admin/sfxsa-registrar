@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { api } from '../lib/apiClient'
 
 interface ClassData {
   id: string
@@ -30,16 +29,6 @@ interface Lesson {
   description: string
 }
 
-interface Material {
-  id: string
-  lesson_id?: string
-  topic_id?: string
-  title: string
-  description: string
-  type: string
-  file_url: string
-  creator_name: string
-}
 
 interface Assignment {
   id: string
@@ -61,15 +50,6 @@ interface Member {
   joined_at: string
 }
 
-interface Submission {
-  id: string
-  student_id: string
-  student_name: string
-  student_email: string
-  grade?: number
-  status: string
-  submitted_at: string
-}
 
 export function ClassroomPage() {
   const { classId } = useParams()
@@ -86,7 +66,6 @@ export function ClassroomPage() {
   // Modals
   const [showTopicModal, setShowTopicModal] = useState(false)
   const [showLessonModal, setShowLessonModal] = useState(false)
-  const [showAssignmentModal, setShowAssignmentModal] = useState(false)
   const [selectedTopicId, setSelectedTopicId] = useState<string>('')
   
   useEffect(() => {
@@ -289,12 +268,6 @@ export function ClassroomPage() {
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                 >
                   + Add Topic
-                </button>
-                <button
-                  onClick={() => setShowAssignmentModal(true)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  + Create Assignment
                 </button>
               </div>
             </div>
@@ -515,7 +488,7 @@ function TopicModal({ onClose, onSave }: { onClose: () => void, onSave: (title: 
   )
 }
 
-function LessonModal({ topicId, onClose, onSave }: { topicId: string, onClose: () => void, onSave: (title: string, desc: string) => void }) {
+function LessonModal({ onClose, onSave }: { topicId: string, onClose: () => void, onSave: (title: string, desc: string) => void }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   
