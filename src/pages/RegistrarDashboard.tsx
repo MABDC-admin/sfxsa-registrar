@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { api } from '../lib/apiClient'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 
 interface RegistrarKpis {
   total_students: number
@@ -11,7 +12,9 @@ interface RegistrarKpis {
 
 export function RegistrarDashboard() {
   const navigate = useNavigate()
+  const { profile } = useAuth()
   const [loading, setLoading] = useState(true)
+  const [menuPermissions, setMenuPermissions] = useState<Array<{menu_key: string, is_enabled: boolean}>>([])
   const [kpis, setKpis] = useState<RegistrarKpis>({
     total_students: 0,
     pending_enrollments: 0,
@@ -19,6 +22,42 @@ export function RegistrarDashboard() {
     total_sections: 0
   })
   const [recentStudents, setRecentStudents] = useState<any[]>([])
+
+  // Load module permissions for Registrar role
+  useEffect(() => {
+    async function loadPermissions() {
+      if (!profile?.role) return
+      try {
+        const { data } = await api.from('role_module_permissions').select('*').eq('role', profile.role)
+        if (data) {
+          setMenuPermissions(data.map((p: any) => ({
+            menu_key: p.module_key,
+            is_enabled: p.is_enabled
+          })))
+        }
+      } catch (err) {
+        console.error('Error loading permissions:', err)
+      }
+    }
+    loadPermissions()
+  }, [profile?.role])
+
+  // Check if a module is enabled
+  const isModuleEnabled = useCallback((moduleKey: string): boolean => {
+    const permission = menuPermissions.find(p => p.menu_key === moduleKey)
+    return permission ? permission.is_enabled : true
+  }, [menuPermissions])
+
+  // Quick action links - only show enabled modules
+  const quickActions = useMemo(() => {
+    const allActions = [
+      { key: 'records', icon: '➕', label: 'Add Student', description: 'Register new student', path: '/records', color: '#E8F5E3' },
+      { key: 'students', icon: '👥', label: 'View Students', description: 'Manage student list', path: '/students', color: '#E0F2FE' },
+      { key: 'records', icon: '📋', label: 'Student Records', description: 'View all records', path: '/records', color: '#FEF3C7' },
+      { key: 'grade-levels', icon: '📚', label: 'Grade Levels', description: 'Manage grades', path: '/grade-levels', color: '#FCE7F3' },
+    ]
+    return allActions.filter(action => isModuleEnabled(action.key))
+  }, [isModuleEnabled])
 
   useEffect(() => {
     async function loadDashboard() {
@@ -102,44 +141,27 @@ export function RegistrarDashboard() {
         {/* Quick Actions */}
         <div className="bg-white rounded-2xl p-6 shadow-sm">
           <h2 className="text-lg font-bold text-gray-800 mb-4">⚡ Quick Actions</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => navigate('/records')}
-              className="p-4 rounded-xl text-left hover:shadow-md transition-shadow"
-              style={{ backgroundColor: '#E8F5E3' }}
-            >
-              <span className="text-2xl">➕</span>
-              <p className="font-medium text-gray-800 mt-2">Add Student</p>
-              <p className="text-xs text-gray-500">Register new student</p>
-            </button>
-            <button
-              onClick={() => navigate('/students')}
-              className="p-4 rounded-xl text-left hover:shadow-md transition-shadow"
-              style={{ backgroundColor: '#E0F2FE' }}
-            >
-              <span className="text-2xl">👥</span>
-              <p className="font-medium text-gray-800 mt-2">View Students</p>
-              <p className="text-xs text-gray-500">Manage student list</p>
-            </button>
-            <button
-              onClick={() => navigate('/records')}
-              className="p-4 rounded-xl text-left hover:shadow-md transition-shadow"
-              style={{ backgroundColor: '#FEF3C7' }}
-            >
-              <span className="text-2xl">📋</span>
-              <p className="font-medium text-gray-800 mt-2">Student Records</p>
-              <p className="text-xs text-gray-500">View all records</p>
-            </button>
-            <button
-              onClick={() => navigate('/grade-levels')}
-              className="p-4 rounded-xl text-left hover:shadow-md transition-shadow"
-              style={{ backgroundColor: '#FCE7F3' }}
-            >
-              <span className="text-2xl">📚</span>
-              <p className="font-medium text-gray-800 mt-2">Grade Levels</p>
-              <p className="text-xs text-gray-500">Manage grades</p>
-            </button>
-          </div>
+          {quickActions.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3">
+              {quickActions.map((action, index) => (
+                <button
+                  key={index}
+                  onClick={() => navigate(action.path)}
+                  className="p-4 rounded-xl text-left hover:shadow-md transition-shadow"
+                  style={{ backgroundColor: action.color }}
+                >
+                  <span className="text-2xl">{action.icon}</span>
+                  <p className="font-medium text-gray-800 mt-2">{action.label}</p>
+                  <p className="text-xs text-gray-500">{action.description}</p>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-400">
+              <p className="text-sm">No quick actions available</p>
+              <p className="text-xs mt-1">Modules may be disabled by admin</p>
+            </div>
+          )}
         </div>
 
         {/* Recent Students */}

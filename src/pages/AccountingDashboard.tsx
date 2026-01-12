@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { api } from '../lib/apiClient'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 
 interface AccountingKpis {
   total_collected: number
@@ -11,7 +12,9 @@ interface AccountingKpis {
 
 export function AccountingDashboard() {
   const navigate = useNavigate()
+  const { profile } = useAuth()
   const [loading, setLoading] = useState(true)
+  const [menuPermissions, setMenuPermissions] = useState<Array<{menu_key: string, is_enabled: boolean}>>([])
   const [kpis, setKpis] = useState<AccountingKpis>({
     total_collected: 0,
     total_expenses: 0,
@@ -19,6 +22,42 @@ export function AccountingDashboard() {
     net_balance: 0
   })
   const [recentTransactions, setRecentTransactions] = useState<any[]>([])
+
+  // Load module permissions for Accounting role
+  useEffect(() => {
+    async function loadPermissions() {
+      if (!profile?.role) return
+      try {
+        const { data } = await api.from('role_module_permissions').select('*').eq('role', profile.role)
+        if (data) {
+          setMenuPermissions(data.map((p: any) => ({
+            menu_key: p.module_key,
+            is_enabled: p.is_enabled
+          })))
+        }
+      } catch (err) {
+        console.error('Error loading permissions:', err)
+      }
+    }
+    loadPermissions()
+  }, [profile?.role])
+
+  // Check if a module is enabled
+  const isModuleEnabled = useCallback((moduleKey: string): boolean => {
+    const permission = menuPermissions.find(p => p.menu_key === moduleKey)
+    return permission ? permission.is_enabled : true
+  }, [menuPermissions])
+
+  // Quick action links - only show enabled modules
+  const quickActions = useMemo(() => {
+    const allActions = [
+      { key: 'finance', icon: '💵', label: 'Record Payment', description: 'Add new payment', path: '/finance', color: '#DCFCE7' },
+      { key: 'finance', icon: '💸', label: 'Add Expense', description: 'Record expense', path: '/finance', color: '#FEE2E2' },
+      { key: 'reports', icon: '📊', label: 'View Reports', description: 'Financial reports', path: '/reports', color: '#E0F2FE' },
+      { key: 'settings', icon: '💰', label: 'Fee Structure', description: 'Manage fees', path: '/settings', color: '#FEF3C7' },
+    ]
+    return allActions.filter(action => isModuleEnabled(action.key))
+  }, [isModuleEnabled])
 
   useEffect(() => {
     async function loadDashboard() {
@@ -96,44 +135,27 @@ export function AccountingDashboard() {
         {/* Quick Actions */}
         <div className="bg-white rounded-2xl p-6 shadow-sm">
           <h2 className="text-lg font-bold text-gray-800 mb-4">⚡ Quick Actions</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => navigate('/finance')}
-              className="p-4 rounded-xl text-left hover:shadow-md transition-shadow"
-              style={{ backgroundColor: '#DCFCE7' }}
-            >
-              <span className="text-2xl">💵</span>
-              <p className="font-medium text-gray-800 mt-2">Record Payment</p>
-              <p className="text-xs text-gray-500">Add new payment</p>
-            </button>
-            <button
-              onClick={() => navigate('/finance')}
-              className="p-4 rounded-xl text-left hover:shadow-md transition-shadow"
-              style={{ backgroundColor: '#FEE2E2' }}
-            >
-              <span className="text-2xl">💸</span>
-              <p className="font-medium text-gray-800 mt-2">Add Expense</p>
-              <p className="text-xs text-gray-500">Record expense</p>
-            </button>
-            <button
-              onClick={() => navigate('/reports')}
-              className="p-4 rounded-xl text-left hover:shadow-md transition-shadow"
-              style={{ backgroundColor: '#E0F2FE' }}
-            >
-              <span className="text-2xl">📊</span>
-              <p className="font-medium text-gray-800 mt-2">View Reports</p>
-              <p className="text-xs text-gray-500">Financial reports</p>
-            </button>
-            <button
-              onClick={() => navigate('/settings')}
-              className="p-4 rounded-xl text-left hover:shadow-md transition-shadow"
-              style={{ backgroundColor: '#FEF3C7' }}
-            >
-              <span className="text-2xl">💰</span>
-              <p className="font-medium text-gray-800 mt-2">Fee Structure</p>
-              <p className="text-xs text-gray-500">Manage fees</p>
-            </button>
-          </div>
+          {quickActions.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3">
+              {quickActions.map((action, index) => (
+                <button
+                  key={index}
+                  onClick={() => navigate(action.path)}
+                  className="p-4 rounded-xl text-left hover:shadow-md transition-shadow"
+                  style={{ backgroundColor: action.color }}
+                >
+                  <span className="text-2xl">{action.icon}</span>
+                  <p className="font-medium text-gray-800 mt-2">{action.label}</p>
+                  <p className="text-xs text-gray-500">{action.description}</p>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-400">
+              <p className="text-sm">No quick actions available</p>
+              <p className="text-xs mt-1">Modules may be disabled by admin</p>
+            </div>
+          )}
         </div>
 
         {/* Recent Transactions */}
